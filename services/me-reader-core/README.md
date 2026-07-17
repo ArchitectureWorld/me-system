@@ -5,6 +5,7 @@ ME-Reader Core is the client-independent backend for evidence-oriented literatur
 ## Current capability
 
 - Validate a Zotero literature metadata record supplied as JSON.
+- Read bibliographic metadata and child PDF identity from the Zotero Local API.
 - Create stable paper and document identities from the Zotero item key.
 - Create a UTF-8 Markdown note under `<vault>/papers/`.
 - Add Zotero item and PDF return links.
@@ -12,7 +13,7 @@ ME-Reader Core is the client-independent backend for evidence-oriented literatur
 - Preserve human content because an existing note is never overwritten.
 - Produce a Markdown diagnostic report without including PDF text or secrets.
 
-This slice does not yet connect to the live Zotero API, parse PDF content, run Hermes reading agents, or install an Obsidian plugin.
+This slice does not yet parse PDF content, run Hermes reading agents, or install an Obsidian plugin.
 
 ## Install for development
 
@@ -21,7 +22,7 @@ cd services/me-reader-core
 python -m pip install -e '.[dev]'
 ```
 
-## Create a paper note
+## Create a paper note from JSON
 
 ```bash
 me-reader create-paper-note \
@@ -29,7 +30,20 @@ me-reader create-paper-note \
   --vault /path/to/your/ME-Brain-vault
 ```
 
-Run the same command again. The status must be `existing`, and the Vault must still contain exactly one note for the item key.
+## Read directly from a running Zotero instance
+
+Enable Zotero local API access in Zotero Settings → Advanced → **Allow other applications on this computer to communicate with Zotero**.
+
+```bash
+me-reader create-paper-note-from-zotero \
+  --item-key ABCD1234 \
+  --zotero-base-url http://127.0.0.1:23119/api \
+  --vault /path/to/your/ME-Brain-vault
+```
+
+For a second instance, provide its configured address, for example `http://127.0.0.1:23120/api`. The address can also be provided through `ME_READER_ZOTERO_BASE_URL`.
+
+ME-Reader only permits HTTP loopback addresses for the local API and never forwards the port externally.
 
 ## Generate a diagnostic report
 

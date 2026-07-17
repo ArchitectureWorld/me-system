@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
 from .diagnostics import run_diagnostics
 from .models import PaperValidationError, ZoteroPaper
 from .obsidian import create_or_find_paper_note
+from .zotero_local import ZoteroLocalApiError, ZoteroLocalClient
 
 
 def _load_paper(path: Path) -> ZoteroPaper:
@@ -27,6 +29,12 @@ def _build_parser() -> argparse.ArgumentParser:
     create = subparsers.add_parser("create-paper-note")
     create.add_argument("--item-json", required=True, type=Path)
     create.add_argument("--vault", required=True, type=Path)
+
+    live = subparsers.add_parser("create-paper-note-from-zotero")
+    live.add_argument("--item-key", required=True)
+    live.add_argument("--vault", required=True, type=Path)
+    live.add_argument("--zotero-base-url")
+    live.add_argument("--citation-key")
 
     diagnose = subparsers.add_parser("diagnose")
     diagnose.add_argument("--vault", required=True, type=Path)
@@ -51,6 +59,31 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(payload, ensure_ascii=False))
             return 0
 
+        if args.command == "create-paper-note-from-zotero":
+            base_url = args.zotero_base_url or os.environ.get("ME_READER_ZOTERO_BASE_URL")
+            if not base_url:
+                raise PaperValidationError(
+                    "A Zotero Local API address is required. Pass --zotero-base-url or set ME_READER_ZOTERO_BASE_URL."
+                )
+            paper = ZoteroLocalClient(base_url).fetch_paper(
+                args.item_key,
+                citation_key_override=args.citation_key,
+            )
+            result = create_or_find_paper_note(args.vault, paper)
+            print(
+                json.dumps(
+                    {
+                        "status": result.status,
+                        "note_path": str(result.path),
+                        "item_uri": result.item_uri,
+                        "pdf_uri": result.pdf_uri,
+                        "zotero_base_url": base_url,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return 0
+
         paper = _load_paper(args.item_json) if args.item_json else None
         report = run_diagnostics(args.vault, paper)
         output = args.output or (Path(args.vault) / "diagnostics" / "me-reader-diagnostic.md")
@@ -65,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 0 if report.overall_status != "FAIL" else 1
-    except (PaperValidationError, ValueError) as exc:
+    except (PaperValidationError, ZoteroLocalApiError, ValueError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 

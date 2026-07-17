@@ -64,3 +64,18 @@ def test_cli_invalid_input_returns_nonzero(tmp_path: Path) -> None:
     assert result.returncode == 2
     payload = json.loads(result.stderr)
     assert "zotero_item_key" in payload["error"]
+
+
+def test_cli_requires_configured_zotero_base_url_for_live_fetch(tmp_path: Path) -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    result = run_cli(
+        project_root,
+        "create-paper-note-from-zotero",
+        "--item-key",
+        "ABCD1234",
+        "--vault",
+        str(tmp_path / "vault"),
+    )
+    assert result.returncode == 2
+    payload = json.loads(result.stderr)
+    assert "zotero-base-url" in payload["error"]
