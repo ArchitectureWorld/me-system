@@ -6,8 +6,8 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect
 
-from me_graph_core.persistence.migrations import upgrade_database
-from me_graph_core.persistence.models import Base
+from me_core.persistence.migrations import upgrade_database
+from me_core.persistence.models import Base
 
 
 def test_upgrade_database_creates_schema(tmp_path: Path) -> None:

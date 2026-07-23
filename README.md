@@ -46,7 +46,7 @@ ME-System 是面向 AI Agent 的**双结构化图谱系统**。
 首个实现位于：
 
 ```text
-services/me-graph-core/
+services/me-core/
 ```
 
 它已经支持：
@@ -68,21 +68,21 @@ services/me-graph-core/
 ### Fixture 体验
 
 ```bash
-cd services/me-graph-core
+cd services/me-core
 python -m pip install -e '.[dev]'
 
-me-graph load-fixture \
+me-system load-fixture \
   --fixture ../../examples/graph/lighting-platform.json
 
-me-graph project-snapshot \
+me-system project-snapshot \
   --fixture ../../examples/graph/lighting-platform.json \
   --project-id brain:project:lighting-platform
 
-me-graph trace-decision \
+me-system trace-decision \
   --fixture ../../examples/graph/lighting-platform.json \
   --decision-id brain:decision:radiance-primary
 
-me-graph task-profile \
+me-system task-profile \
   --fixture ../../examples/graph/lighting-platform.json \
   --user-id who:user:master \
   --project-id brain:project:lighting-platform \
@@ -94,14 +94,14 @@ me-graph task-profile \
 ```bash
 export ME_GRAPH_DATABASE_URL='postgresql+psycopg://me_graph:你的密码@127.0.0.1:5432/me_graph'
 
-me-graph db-upgrade
-me-graph import-fixture \
+me-system db-upgrade
+me-system import-fixture \
   --fixture ../../examples/graph/lighting-platform.json
-me-graph project-snapshot \
+me-system project-snapshot \
   --project-id brain:project:lighting-platform
 ```
 
-部署说明见 [`services/me-graph-core/README.md`](services/me-graph-core/README.md)。
+部署说明见 [`services/me-core/README.md`](services/me-core/README.md)。
 
 ### Hermes 只读 MCP
 
@@ -122,7 +122,7 @@ who_get_task_profile
 ME_GRAPH_DATABASE_URL='postgresql+psycopg://me_graph_reader:密码@127.0.0.1:5432/me_graph' \
 ME_GRAPH_HERMES_USER_ID='who:user:master' \
 ME_GRAPH_ALLOWED_PROJECT_IDS='brain:project:lighting-platform' \
-me-graph-mcp
+me-system-mcp
 ```
 
 Hermes 配置、只读数据库账号和工具白名单见 [`integrations/hermes/README.md`](integrations/hermes/README.md)。
@@ -130,7 +130,7 @@ Hermes 配置、只读数据库账号和工具白名单见 [`integrations/hermes
 ### 测试
 
 ```bash
-cd services/me-graph-core
+cd services/me-core
 pytest -q
 python -m compileall -q src
 ```
@@ -140,7 +140,7 @@ python -m compileall -q src
 ```text
 me-system/
 ├── services/
-│   ├── me-graph-core/
+│   ├── me-core/
 │   ├── source-ledger/
 │   ├── document-normalizer/
 │   ├── graph-ingestion/
@@ -162,7 +162,7 @@ me-system/
 └── docs/
 ```
 
-当前 `me-graph-core` 将契约、内存 Store、PostgreSQL Store、迁移、查询和 Hermes stdio MCP 放在一个可运行包中。等接口与真实工作流稳定后，再按目标结构拆分服务。
+当前 `me-core` 将契约、内存 Store、PostgreSQL Store、迁移、查询和 Hermes stdio MCP 放在一个可运行包中。等接口与真实工作流稳定后，再按目标结构拆分服务。
 
 ## 文档导航
 

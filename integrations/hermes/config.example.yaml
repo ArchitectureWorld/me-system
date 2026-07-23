@@ -1,6 +1,6 @@
 mcp_servers:
   me_system:
-    command: "me-graph-mcp"
+    command: "me-system-mcp"
     env:
       # Hermes currently passes explicit env values to stdio MCP servers.
       # Replace this placeholder in your local ~/.hermes/config.yaml and

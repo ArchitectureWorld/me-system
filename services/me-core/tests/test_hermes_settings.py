@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from me_graph_core.errors import HermesConfigurationError
-from me_graph_core.hermes.settings import HermesServerSettings
+from me_core.errors import HermesConfigurationError
+from me_core.hermes.settings import HermesServerSettings
 
 
 def valid_env() -> dict[str, str]:

@@ -15,7 +15,7 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(PROJECT_ROOT / "src")
     return subprocess.run(
-        [sys.executable, "-m", "me_graph_core", *args],
+        [sys.executable, "-m", "me_core", *args],
         cwd=PROJECT_ROOT,
         env=env,
         text=True,

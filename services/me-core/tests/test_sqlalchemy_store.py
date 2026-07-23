@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import inspect
 
-from me_graph_core.contracts import (
+from me_core.contracts import (
     AuthorityLevel,
     ConfirmationStatus,
     EvidenceRef,
@@ -16,14 +16,14 @@ from me_graph_core.contracts import (
     Sensitivity,
     TemporalStatus,
 )
-from me_graph_core.errors import (
+from me_core.errors import (
     DuplicateGraphObjectError,
     GraphNamespaceError,
     GraphObjectNotFoundError,
 )
-from me_graph_core.persistence.models import create_schema
-from me_graph_core.persistence.store import SqlAlchemyGraphStore
-from me_graph_core.persistence.testing import create_sqlite_test_engine
+from me_core.persistence.models import create_schema
+from me_core.persistence.store import SqlAlchemyGraphStore
+from me_core.persistence.testing import create_sqlite_test_engine
 
 
 def evidence(source_id: str, ordinal: int = 0) -> EvidenceRef:

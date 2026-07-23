@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, inspect
 
-from me_graph_core.cli import main
+from me_core.cli import main
 
 
 FIXTURE = Path(__file__).resolve().parents[3] / "examples" / "graph" / "lighting-platform.json"

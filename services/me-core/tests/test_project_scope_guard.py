@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from me_graph_core.errors import ProjectAccessError
-from me_graph_core.fixtures import load_graph_fixture
-from me_graph_core.hermes.access import ProjectScopeGuard
-from me_graph_core.store import InMemoryGraphStore
+from me_core.errors import ProjectAccessError
+from me_core.fixtures import load_graph_fixture
+from me_core.hermes.access import ProjectScopeGuard
+from me_core.store import InMemoryGraphStore
 
 FIXTURE = (
     Path(__file__).resolve().parents[3]

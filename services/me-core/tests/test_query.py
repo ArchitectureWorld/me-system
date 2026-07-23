@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from me_graph_core.contracts import GraphNamespace
-from me_graph_core.fixtures import load_graph_fixture
-from me_graph_core.query import GraphQueryService
-from me_graph_core.store import InMemoryGraphStore
+from me_core.contracts import GraphNamespace
+from me_core.fixtures import load_graph_fixture
+from me_core.query import GraphQueryService
+from me_core.store import InMemoryGraphStore
 
 
 FIXTURE = Path(__file__).resolve().parents[3] / "examples" / "graph" / "lighting-platform.json"

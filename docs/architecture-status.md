@@ -21,7 +21,7 @@
 - `docs/specs/dual-graph-contract-v0.1.md`
 - `docs/specs/me-brain-ontology-v0.1.md`
 - `docs/specs/me-who-ontology-v0.1.md`
-- `services/me-graph-core/schemas/`
+- `services/me-core/schemas/`
 - `docs/superpowers/specs/2026-07-23-postgresql-graph-store-design.md`
 - `docs/superpowers/specs/2026-07-23-hermes-readonly-mcp-design.md`
 
@@ -29,7 +29,7 @@
 
 ### 图谱契约与查询
 
-- `services/me-graph-core/`
+- `services/me-core/`
 - `examples/graph/lighting-platform.json`
 - ME-Brain、ME-Who、Bridge 命名空间；
 - 当前项目快照、决策链、子图、证据和任务画像查询；
