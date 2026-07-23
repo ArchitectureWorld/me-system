@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${ME_GRAPH_POSTGRES_USER}
       POSTGRES_PASSWORD: ${ME_GRAPH_POSTGRES_PASSWORD}
     ports:
-      - "${ME_GRAPH_POSTGRES_PORT:-5432}:5432"
+      - "${ME_GRAPH_POSTGRES_BIND:-127.0.0.1}:${ME_GRAPH_POSTGRES_PORT:-5432}:5432"
     volumes:
       - me_graph_postgres:/var/lib/postgresql/data
     healthcheck:
