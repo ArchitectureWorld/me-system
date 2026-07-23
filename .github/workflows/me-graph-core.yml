@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,6 +33,39 @@ jobs:
           - "3.11"
           - "3.12"
 
+    defaults:
+      run:
+        working-directory: services/me-graph-core
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: services/me-graph-core/pyproject.toml
+
+      - name: Install package and test dependencies
+        run: python -m pip install -q -e '.[dev]'
+
+      - name: Run graph core and pure Hermes tests
+        run: >-
+          pytest -q --tb=short
+          --ignore=tests/test_mcp_server.py
+          --ignore=tests/test_mcp_stdio.py
+          --ignore=tests/test_postgres_integration.py
+
+      - name: Run FastMCP tool surface tests
+        run: pytest -q --tb=short tests/test_mcp_server.py
+
+      - name: Compile Python sources
+        run: python -m compileall -q src
+
+  postgres-e2e:
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16
@@ -59,27 +92,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: services/me-graph-core/pyproject.toml
 
       - name: Install package and test dependencies
         run: python -m pip install -q -e '.[dev]'
 
-      - name: Run graph core and pure Hermes tests
-        run: >-
-          pytest -q --tb=short
-          --ignore=tests/test_mcp_server.py
-          --ignore=tests/test_mcp_stdio.py
-
-      - name: Run FastMCP tool surface tests
-        run: pytest -q --tb=short tests/test_mcp_server.py
+      - name: Run PostgreSQL GraphStore integration
+        run: pytest -q --tb=short tests/test_postgres_integration.py
 
       - name: Run stdio MCP PostgreSQL end-to-end test
         run: pytest -q --tb=short tests/test_mcp_stdio.py
-
-      - name: Compile Python sources
-        run: python -m compileall -q src
