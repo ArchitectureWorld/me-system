@@ -10,37 +10,35 @@ ME-System
 └── ME-Who
 ```
 
-后续只深化这两个产品图谱。
+后续只深化这两个权威图谱领域。
 
-共享的来源、证据、候选、存储、查询、权限、MCP 和 CLI 使用 `shared/` 实现，不拥有第三个产品名称。
+Evidence、Ingestion、Candidate、Review、Persistence、Query、Bridge、MCP 与 CLI 都是同一个 `me_system` 包中的内部职责，不拥有第三个产品名称。
 
-两个图谱共同参考 Codebase-Memory：
+两个图谱共同参考 Codebase-Memory 与 Graphify：
 
 ```text
 Persistent Graph First
-+ Multi-pass Incremental Indexing
++ Multi-stage Incremental Indexing
 + Typed MCP
 + Compact First
-+ Status / Coverage
++ Path-based Explanation
++ Status / Coverage / Ambiguity
 + CLI / MCP Parity
 ```
 
-## Phase 0：双图谱基线
-
-已完成首版：
+## Phase 0：双图谱基线——已完成首版
 
 - ME-Brain、ME-Who、Bridge namespace；
 - `GraphNode`、`GraphEdge`、`EvidenceRef`；
 - `CandidateGraphChange`；
 - `GraphSlice`；
 - 内存 Store；
-- 进程内候选审核；
 - `lighting-platform` 示例；
 - 项目快照、决策链、证据和任务画像查询。
 
-## Phase 1：持久化与只读 Agent 闭环
+## Phase 1：持久化与只读 Agent 闭环——已完成首版
 
-### 已完成：PostgreSQL 权威存储
+### PostgreSQL 权威存储
 
 - SQLAlchemy 2.0；
 - PostgreSQL + psycopg 3；
@@ -49,10 +47,9 @@ Persistent Graph First
 - 原子写入和事务回滚；
 - ME-Brain、ME-Who、Bridge 约束；
 - Alembic 迁移；
-- CLI；
 - Python 3.11 / 3.12 + PostgreSQL CI。
 
-### 已完成：Project Resolve 与 Hermes MCP
+### Project Resolve 与 Hermes MCP
 
 - canonical ID、label、alias、workspace path 和 external ID 精确解析；
 - 不使用 LLM 模糊猜项目；
@@ -62,125 +59,71 @@ Persistent Graph First
 - 六工具 stdio MCP；
 - PostgreSQL 16 + MCP ClientSession E2E。
 
-### 待真实数据验证
-
-比较：
+### 统一运行包
 
 ```text
-A. Hermes 直接探索项目文件
-B. Hermes + ME-Brain GraphSlice
-C. Hermes + ME-Brain + ME-Who Task Profile
+Distribution: me-system
+Import:       me_system
+CLI:          me-system
+MCP:          me-system-mcp
 ```
 
-指标：
+旧 `ME-Core`、`ME-Graph-Core`、`me_core` 与 `me_graph_core` 不再作为活动产品或代码身份。
 
-- Token；
-- 工具调用次数；
-- 项目恢复延迟；
-- 当前事实准确率；
-- 过期方案误用率；
-- 重复询问和用户纠正次数。
+## Phase 2：共享输入与治理闭环——当前完成首版
 
-## Phase 2：命名与物理结构收敛
-
-这是当前第一优先级。
-
-PR #6 曾将共享运行包命名为 ME-Core。该名字容易被误解为第三个产品，因此需要迁移为中性实现结构：
-
-```text
-services/me-core/   → shared/
-me_core             → me_system
-ME-Core workflow    → ME-System workflow
-```
-
-目标结构：
-
-```text
-me-system/
-├── me-brain/
-│   ├── ontology/
-│   ├── passes/
-│   └── queries/
-├── me-who/
-│   ├── ontology/
-│   ├── passes/
-│   └── queries/
-├── shared/
-│   ├── contracts/
-│   ├── graph/
-│   ├── evidence/
-│   ├── ingestion/
-│   ├── persistence/
-│   ├── permissions/
-│   └── query/
-└── integrations/
-    ├── mcp/
-    ├── hermes/
-    └── pi/
-```
-
-验收：
-
-- README 只展示 ME-Brain 与 ME-Who；
-- Python 主包为 `me_system`；
-- CLI 为 `me-system`；
-- MCP 命令为 `me-system-mcp`；
-- 旧 import/命令只保留临时兼容；
-- 现有全部测试和 MCP E2E 不回归。
-
-## Phase 3：共享输入与治理闭环
-
-### 3.1 Source / Evidence
-
-实现：
+### Source / Evidence
 
 ```text
 SourceRecord
 EvidenceFragment
 ```
 
-要求：
+能力：
 
-- 来源不可静默覆盖；
-- 内容哈希与幂等键；
+- 不可变来源登记；
+- 内容 SHA-256 与幂等键；
 - 稳定 SourceAnchor；
 - 敏感等级；
+- 来源与片段冲突检测；
 - 图谱对象可回到 EvidenceFragment；
-- 不强制所有来源先转换为复杂文档模型。
+- 不要求所有来源先进入复杂文档模型。
 
-### 3.2 Ingestion Status / Coverage
-
-实现：
+### Ingestion Status / Coverage
 
 ```text
 IngestionRun
-├── adapter / pass version
+├── adapter name / version
+├── pending / running / completed / partial / failed
 ├── input / processed / skipped / failed
 ├── fragment / candidate counts
 ├── coverage_ratio
 ├── quality_report
-└── log_ref
+├── log_ref
+└── error_summary
 ```
 
-必须区分：
+系统必须区分：
 
 ```text
 图谱中不存在
 ≠ 尚未摄取
 ≠ 摄取失败
 ≠ 部分覆盖
+≠ 候选尚未审核
 ```
 
-### 3.3 Persistent Candidate Buffer
+### Persistent Candidate Queue
 
 - Candidate 跨重启持久化；
 - EvidenceRef 顺序；
 - 幂等重试；
-- payload 或证据冲突检测；
-- 按目标图谱、来源和状态过滤；
-- ReviewEvent。
+- payload 冲突检测；
+- 按目标图谱和来源过滤；
+- 追加式 `ReviewEvent`；
+- submitted / approved / rejected 全历史。
 
-### 3.4 Atomic Candidate Review
+### Atomic Candidate Review
 
 同一 PostgreSQL 事务：
 
@@ -188,8 +131,8 @@ IngestionRun
 lock Candidate
 → validate pending
 → materialize GraphNode / GraphEdge
-→ validate evidence and namespace
-→ write canonical object
+→ validate evidence / endpoint / namespace
+→ write canonical object and evidence
 → update Candidate
 → append ReviewEvent
 → commit
@@ -197,32 +140,96 @@ lock Candidate
 
 失败整笔回滚。
 
-### 3.5 验收
+### 治理 CLI
+
+```text
+source-register
+source-show
+candidate-submit
+candidate-list
+candidate-approve
+candidate-reject
+```
+
+这些命令是内部治理入口，不加入当前 Hermes MCP。
+
+### Phase 2 验收
 
 - Source、Fragment、Run、Candidate、ReviewEvent 跨进程保存；
 - 重复摄取不重复建数据；
 - Candidate 重试幂等；
 - 审核失败不留下部分写入；
 - 权威对象可回到 EvidenceFragment；
+- 同一来源可同时生成 ME-Brain 与 ME-Who Candidate；
 - Hermes 六工具不回归；
 - 不新增第二个数据库或第三个产品。
 
-## Phase 4：两个图谱的输入 Pass
+## Phase 3：增量索引基础——下一优先级
 
-共享 Pass 只处理来源与标准化，业务 Pass 分别归属 ME-Brain 或 ME-Who。
+### 3.1 Source Manifest
+
+新增：
 
 ```text
-Discover
-→ Normalize
-→ Fragment
-→ Brain Candidate Pass / Who Candidate Pass
-→ Resolve Identity
-→ Detect Conflict
-→ Review
-→ Commit
+SourceManifest
+├── source identity
+├── content hash
+├── adapter name / version
+├── extraction rule / model version
+├── last successful run
+├── coverage
+└── graph candidate identities
 ```
 
-推荐 Adapter 顺序：
+目标：
+
+- 只处理新增或变化内容；
+- Adapter 重跑可解释；
+- 明确哪个版本生成了哪些 Candidate；
+- 支持安全重建和差异比较。
+
+### 3.2 Derivation Kind
+
+在 Candidate / Graph Schema v0.2 增加：
+
+```text
+EXPLICIT
+RULE_DERIVED
+MODEL_INFERRED
+AMBIGUOUS
+HUMAN_ASSERTED
+```
+
+它与以下字段独立：
+
+- authority；
+- confirmation_status；
+- confidence；
+- source_refs。
+
+### 3.3 Adapter SDK
+
+统一 Adapter 接口：
+
+```text
+detect
+→ normalize
+→ fragment
+→ propose Brain Candidates
+→ propose Who Candidates
+→ report coverage / quality
+```
+
+Adapter 不能：
+
+- 建立自己的数据库；
+- 直接写权威图谱；
+- 创建新的 MCP 业务模型；
+- 隐藏失败和跳过范围。
+
+## Phase 4：第一个真实输入 Adapter
+
+推荐顺序：
 
 ```text
 Agent Conversation
@@ -232,164 +239,130 @@ Agent Conversation
 → DOCX / PDF
 ```
 
-### Agent Conversation
+### Agent Conversation Adapter
 
 ```text
 对话导出
 → SourceRecord
-→ conversation_message Fragment
-→ ME-Brain Candidate
-→ ME-Who Candidate
+→ conversation_message EvidenceFragment
+→ Brain Candidate Pass
+→ Who Candidate Pass
+→ conflict detection
+→ review
+→ canonical graphs
 ```
 
-同一消息可以为两个图谱分别产生候选，但不得生成第三类业务图谱。
+第一版优先抽取：
 
-### Markdown
+#### ME-Brain
 
-优先保留：
+- Project；
+- Decision；
+- Requirement；
+- Task；
+- Issue；
+- Constraint；
+- Artifact reference。
 
-- 文件版本；
-- 标题、段落、列表和代码块；
-- 原文位置；
-- Frontmatter；
-- 文件内链接。
+#### ME-Who
 
-### Git
+- explicit UserFact；
+- Role；
+- Capability；
+- CollaborationRule；
+- project-scoped Preference。
 
-优先产生确定性结构：
+不做完整人格推断。
 
-- Repository；
-- Commit；
-- changed files；
-- issue/PR 外部 ID；
-- Artifact lineage 候选。
+## Phase 5：路径式查询与影响分析
 
-语义决策仍进入 Candidate。
-
-## Phase 5：查询质量与 Codebase-Memory 式工具深化
-
-### Compact / Standard / Full
+吸收 Graphify / Codebase-Memory：
 
 ```text
-compact   ID、类型、标签、状态、关键关系
-standard  增加属性、时间、证据句柄、coverage
-full      按权限增加证据片段与完整属性
-```
-
-结果统一提供：
-
-```text
-total
-returned
-truncated
-next_cursor
-quality
-coverage
-```
-
-### ME-Brain 工具候选
-
-```text
-brain_get_schema
-brain_get_ingestion_status
+brain_get_node
+brain_get_neighbors
+brain_shortest_path
+brain_explain_path
 brain_analyze_impact
-brain_get_artifact_lineage
 ```
 
-### ME-Who 工具候选
+原则：
+
+- 领域工具优先；
+- 路径工具用于探索和诊断；
+- 每条路径可返回 EvidenceRef；
+- 不开放任意写入型 Cypher；
+- 查询必须受项目、权限、深度和结果数量限制。
+
+## Phase 6：Graph Report 与 Benchmark
+
+### Graph Report
+
+可再生投影：
 
 ```text
-who_explain_preference
-who_get_profile_history
-who_get_evidence
+me-system-out/
+├── brain-report.md
+├── brain-snapshot.json
+├── graph-manifest.json
+├── who-report.md        # 默认本地私有
+└── graph.html           # 后置
 ```
 
-工具必须：
+### Benchmark
 
-- 归属 `brain_*` 或 `who_*`；
-- 证明能降低 Token 或提高准确率；
-- 通过统一 Tool Registry 注册；
-- 与 CLI 共用应用服务。
-
-不增加 `core_*`、`context_*` 或独立 Source 产品工具面。
-
-## Phase 6：ME-Who 深化
-
-后续增加：
-
-- 用户确认偏好；
-- 有效期和替代；
-- 行为证据候选；
-- 用户确认、限制和禁止使用；
-- 字段级授权；
-- Agent 使用审计。
-
-ME-Who 必须比代码图更严格：
-
-- 证据必需；
-- 推断与明确事实分离；
-- 适用范围明确；
-- 默认最小暴露；
-- 不向普通 Agent 开放任意图查询。
-
-## Phase 7：治理界面、Pi 与领域包
-
-### 候选治理界面
-
-第一版只需要：
-
-- Candidate 列表；
-- Evidence 预览；
-- 批准、驳回；
-- ReviewEvent；
-- coverage 和 quality；
-- ME-Who 敏感信息治理。
-
-不优先建设大型图谱画布。
-
-### Pi / 执行 Agent
-
-- 当前项目 GraphSlice；
-- 任务相关 ME-Who 规则；
-- 证据下钻；
-- Candidate 提交。
-
-Pi 默认不读取完整 ME-Who。
-
-### 领域扩展
-
-ME-Brain 领域包：
+比较：
 
 ```text
-Software: Repository / Module / Component / Commit / PR / Test
-Research: Paper / Claim / Method / Dataset / Experiment / Finding
-Design: Brief / Option / DesignDecision / Drawing / Model / Review
+A. Agent 直接探索全部来源
+B. 全文 / 向量检索
+C. ME-System Graph Query
 ```
 
-领域包扩展 ME-Brain 本体和查询，不创建独立 Store 或第三产品。
+指标：
 
-## 数据库演进原则
+- Token；
+- 工具调用次数；
+- 项目恢复延迟；
+- 当前事实准确率；
+- 历史事实混淆率；
+- 证据覆盖率；
+- 摄取和增量更新时间；
+- 用户重复纠正次数。
 
-当前唯一权威存储是 PostgreSQL。
+第一组继续使用 `lighting-platform`。
 
-只有真实多跳查询、图算法或规模指标证明关系表不足时，才评估图扩展或独立图数据库。任何替代方案必须：
+## Phase 7：领域深化
 
-- 保持 ME-Brain / ME-Who 语义；
-- 通过相同契约与 GraphSlice 对照；
-- 说明事务、权限、迁移和回滚成本；
-- 不形成并行真相源。
+### Software
+
+```text
+Repository / Module / Component / Interface / Commit / PR / Test
+```
+
+### Research
+
+```text
+Paper / Claim / Evidence / Method / Dataset / Experiment / Finding
+```
+
+Zotero 与 Obsidian 代码归入本领域。
+
+### Design
+
+```text
+Brief / Option / DesignDecision / Drawing / Model / Review / Revision
+```
 
 ## 暂停开发
 
-在输入候选闭环和真实 Benchmark 通过前，不优先投入：
+在增量摄取、路径查询和 Benchmark 通过前，不优先投入：
 
-- 独立 Source / Candidate / MCP 服务；
-- 第三个产品图谱；
-- 完整多 Agent Handoff；
-- 万能文档标准；
+- 完整多 Agent Handoff 平台；
+- 全格式万能文档标准；
 - 独立 ME-Reader；
 - 数字人格；
 - 大型图谱前端；
-- 自动语义知识确认；
-- 多数据库并行；
-- 普通 Agent 任意 Cypher。
+- 全自动知识确认；
+- 多数据库并行架构；
+- 任意图查询语言。
