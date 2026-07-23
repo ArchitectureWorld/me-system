@@ -6,12 +6,19 @@ on:
       - agent/rename-me-core
     paths:
       - ".github/me-core-rename-trigger"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+    paths:
+      - ".github/me-core-rename-trigger"
 
 permissions:
   contents: write
 
 jobs:
   rename:
+    if: github.head_ref == 'agent/rename-me-core' || github.ref_name == 'agent/rename-me-core'
     runs-on: ubuntu-latest
     steps:
       - name: Check out rename branch
@@ -107,7 +114,6 @@ jobs:
 
           pyproject = Path("services/me-core/pyproject.toml")
           text = pyproject.read_text(encoding="utf-8")
-          text = text.replace('name = "me-core"', 'name = "me-core"', 1)
           old = '''[project.scripts]\nme-graph = "me_core.cli:main"\nme-graph-mcp = "me_core.hermes.mcp_server:main"'''
           new = '''[project.scripts]\nme-system = "me_core.cli:main"\nme-system-mcp = "me_core.hermes.mcp_server:main"\nme-graph = "me_core.cli:main"\nme-graph-mcp = "me_core.hermes.mcp_server:main"'''
           if old not in text:
