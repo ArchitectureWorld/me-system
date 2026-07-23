@@ -12,15 +12,15 @@ from mcp.client.stdio import stdio_client
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
-from me_core.fixtures import load_graph_fixture
-from me_core.hermes.mcp_server import TOOL_NAMES
-from me_core.persistence.database import create_database_engine
-from me_core.persistence.migrations import upgrade_database
-from me_core.persistence.store import create_postgres_graph_store
+from me_system.fixtures import load_graph_fixture
+from me_system.hermes.mcp_server import TOOL_NAMES
+from me_system.persistence.database import create_database_engine
+from me_system.persistence.migrations import upgrade_database
+from me_system.persistence.store import create_postgres_graph_store
 
 POSTGRES_URL = os.getenv("ME_GRAPH_TEST_POSTGRES_URL")
 FIXTURE = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[1]
     / "examples"
     / "graph"
     / "lighting-platform.json"
@@ -52,7 +52,7 @@ def test_hermes_stdio_mcp_end_to_end() -> None:
         load_graph_fixture(FIXTURE, store)
         parameters = StdioServerParameters(
             command=sys.executable,
-            args=["-m", "me_core.hermes.mcp_server"],
+            args=["-m", "me_system.hermes.mcp_server"],
             env={
                 **os.environ,
                 "ME_GRAPH_DATABASE_URL": isolated_url,
