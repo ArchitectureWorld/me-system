@@ -3,6 +3,8 @@ name: ME-Graph Core
 on:
   pull_request:
     paths:
+      - "README.md"
+      - "docs/**"
       - "services/me-graph-core/**"
       - "examples/graph/**"
       - "deploy/postgres/**"
@@ -11,6 +13,8 @@ on:
     branches:
       - main
     paths:
+      - "README.md"
+      - "docs/**"
       - "services/me-graph-core/**"
       - "examples/graph/**"
       - "deploy/postgres/**"
