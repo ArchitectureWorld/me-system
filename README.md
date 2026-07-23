@@ -54,15 +54,18 @@ services/me-graph-core/
 - `GraphNode`、`GraphEdge`、`EvidenceRef`、`CandidateGraphChange`、`GraphSlice`；
 - ME-Brain、ME-Who 与 Bridge 三类命名空间；
 - 图谱节点和边的来源、时间、权威级别、确认状态与敏感度；
+- `InMemoryGraphStore` 与 PostgreSQL `SqlAlchemyGraphStore`；
+- Alembic 数据库迁移和 psycopg 3 连接；
 - 候选变更提交、人工批准和驳回；
 - 当前项目快照；
 - 决策替代链追踪；
 - 子图展开；
 - 原始证据查询；
 - 任务相关的 ME-Who 协作规则筛选；
-- `lighting-platform` 双图谱示例。
+- `lighting-platform` 双图谱示例；
+- Python 3.11 / 3.12 与真实 PostgreSQL 的 CI 验证。
 
-### 本地体验
+### Fixture 体验
 
 ```bash
 cd services/me-graph-core
@@ -86,11 +89,26 @@ me-graph task-profile \
   --task-type implementation
 ```
 
+### PostgreSQL 持久化
+
+```bash
+export ME_GRAPH_DATABASE_URL='postgresql+psycopg://me_graph:你的密码@127.0.0.1:5432/me_graph'
+
+me-graph db-upgrade
+me-graph import-fixture \
+  --fixture ../../examples/graph/lighting-platform.json
+me-graph project-snapshot \
+  --project-id brain:project:lighting-platform
+```
+
+部署与安全说明见 [`services/me-graph-core/README.md`](services/me-graph-core/README.md)。
+
 ### 测试
 
 ```bash
 cd services/me-graph-core
 pytest -q
+python -m compileall -q src
 ```
 
 ## 仓库目标结构
@@ -120,7 +138,7 @@ me-system/
 └── docs/
 ```
 
-当前 `me-graph-core` 将契约、内存存储和查询放在一个可运行包中。等接口稳定后，再按上面的目标结构拆分服务。
+当前 `me-graph-core` 将契约、内存 Store、PostgreSQL Store、迁移和查询放在一个可运行包中。等接口与真实工作流稳定后，再按目标结构拆分服务。
 
 ## 文档导航
 
@@ -133,20 +151,22 @@ me-system/
 - [ME-Brain 产品定义](docs/products/me-brain.md)
 - [ME-Who 产品定义](docs/products/me-who.md)
 - [推荐开发路径](docs/roadmap/recommended-development-path.md)
+- [PostgreSQL GraphStore 设计](docs/superpowers/specs/2026-07-23-postgresql-graph-store-design.md)
 - [Hermes 接入边界](integrations/hermes/README.md)
 - [Pi 接入边界](integrations/pi/README.md)
 
 ## 当前开发优先级
 
 ```text
-1. 双图谱契约与真实样本
-2. ME-Brain 只读查询闭环
-3. Hermes MCP 只读 Adapter
-4. Source / Evidence 与文档、对话、Git Adapter
-5. 最小 ME-Who 图谱
-6. 候选图谱变更审核
-7. Pi Extension
-8. Research / Software / Design 领域扩展
+1. 双图谱契约与真实样本                  已完成首版
+2. PostgreSQL GraphStore                 已完成首版
+3. 项目 ID Resolve 与只读 Graph Query API
+4. Hermes MCP 只读 Adapter
+5. Source / Evidence 与对话、Markdown、Git Adapter
+6. 最小 ME-Who 图谱深化
+7. Candidate 持久化与治理
+8. Pi Extension
+9. Research / Software / Design 领域扩展
 ```
 
-在这些基础稳定前，不优先开发完整前端、复杂 Handoff 平台、全格式文档解析或数字人格。
+在 Hermes 只读闭环和输入候选闭环稳定前，不优先开发完整前端、复杂 Handoff 平台、全格式文档解析或数字人格。
