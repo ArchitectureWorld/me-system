@@ -8,7 +8,7 @@ ME-System
 └── ME-Who     用户事实、能力、偏好与协作图谱
 ```
 
-**没有第三个产品或第三个 Core。** Persistence、Evidence、Ingestion、Candidate Review、Query、Bridge 与 MCP 都只是 ME-System 的内部实现职责。
+**没有第三个产品或第三个 Core。** Evidence、Ingestion、Candidate Review、Persistence、Query、Bridge、CLI 与 MCP 都只是 ME-System 的内部实现职责。
 
 ## 一句话架构
 
@@ -16,10 +16,13 @@ ME-System
 文件 / 对话 / Git / Zotero / 邮件
                  │
                  ▼
-          Source & Evidence
+       SourceRecord / EvidenceFragment
                  │
                  ▼
-       Candidate Graph Changes
+             IngestionRun
+                 │
+                 ▼
+        CandidateGraphChange
                  │
           审核 / 规则确认
                  │
@@ -40,14 +43,14 @@ ME-System
 ME-Brain 与 ME-Who 共同吸收 Codebase-Memory 和 Graphify 的有效方法：
 
 1. **Persistent graph first**：先建立持久化结构图，再让 Agent 查询；
-2. **Multi-stage indexing**：来源检测、标准化、证据、候选、审核和分析分阶段完成；
+2. **Multi-stage indexing**：来源、证据、摄取、候选、审核和分析分阶段完成；
 3. **Typed MCP tools**：工具直接表达结构问题，不提供泛化聊天接口；
 4. **Compact first**：默认返回紧凑子图，需要时再下钻证据与原文；
 5. **Path-based explanation**：答案应能沿节点、关系和证据路径解释；
 6. **Incremental indexing**：通过内容哈希、Adapter 版本和 Manifest 只处理变化内容；
-7. **CLI / MCP parity**：CLI 与 MCP 复用同一查询服务；
+7. **CLI / MCP parity**：CLI 与 MCP 复用同一应用与查询服务；
 8. **Status / coverage**：显式报告未覆盖、部分覆盖、失败和歧义；
-9. **Agent as intelligence layer**：Agent 理解任务和解释结果，后端不成为未经审核的事实源。
+9. **Agent as intelligence layer**：Agent 理解任务和提出候选，后端不把未经审核的模型输出当权威事实。
 
 ME-System 不照搬：
 
@@ -56,13 +59,11 @@ ME-System 不照搬：
 - 一个 `graph.json` 作为权威数据库；
 - ME-Brain 与 ME-Who 合并为无权限边界的平面图；
 - 将完整 ME-Who 图谱提交 Git；
-- 一次性开放大量工具。
+- 一次性开放大量未经 Benchmark 验证的工具。
 
 ## 两个图谱分别做什么
 
 ### ME-Brain
-
-主要节点：
 
 ```text
 Project / Requirement / Decision / Task / Issue / Constraint
@@ -87,8 +88,6 @@ BLOCKS / IMPLEMENTS / PRODUCES / SUPPORTED_BY
 - 某项变化会影响哪些节点和路径。
 
 ### ME-Who
-
-主要节点：
 
 ```text
 User / Role / Capability / Preference / CollaborationRule
@@ -117,11 +116,11 @@ PARTICIPATES_IN / SUPERSEDES / CONFIRMED_BY / SUPPORTED_BY
 2. **一个 PostgreSQL 权威数据源。** 两个图谱用 namespace 和权限隔离。
 3. **Graph first。** Agent 默认读 GraphSlice，不重新扫描全部来源。
 4. **Candidate first。** 自动解析和 Agent 只能提交候选，不能直接修改权威图谱。
-5. **Evidence required。** 高价值节点和关系必须能回到证据。
-6. **MCP 是薄适配。** 只调用查询服务，不定义图谱 Schema。
+5. **Evidence required。** 高价值节点和关系必须能回到证据片段。
+6. **MCP 是薄适配。** 只调用应用和查询服务，不定义图谱 Schema。
 7. **项目范围显式。** ME-Brain 查询必须限定项目。
 8. **ME-Who 最小暴露。** 只返回当前 Agent 和任务真正需要的内容。
-9. **质量可见。** 截断、覆盖率、推导方式和失败范围必须显式返回。
+9. **质量可见。** 覆盖率、跳过项、失败项、歧义和推导方式必须显式记录。
 10. **不再新增 Core、Context、Reader 等平级产品名称。**
 
 ## 当前可运行能力
@@ -132,19 +131,23 @@ PARTICIPATES_IN / SUPERSEDES / CONFIRMED_BY / SUPPORTED_BY
 src/me_system/
 ```
 
-当前已经支持：
+已经支持：
 
 - `GraphNode`、`GraphEdge`、`EvidenceRef`、`CandidateGraphChange`、`GraphSlice`；
 - ME-Brain、ME-Who 与 Bridge namespace；
-- 来源、时间、权威级别、确认状态与敏感度；
+- 时间、权威级别、确认状态、置信度与敏感度；
 - 内存 Store 与 PostgreSQL `SqlAlchemyGraphStore`；
 - Alembic 迁移和 psycopg 3；
-- 进程内 Candidate 提交、批准和驳回；
 - 项目快照、决策链、子图和证据查询；
 - 任务相关 ME-Who 规则筛选；
 - 确定性 Project Resolver；
 - Hermes 六工具只读 stdio MCP；
 - 项目 allowlist、固定 ME-Who 用户和范围保护；
+- `SourceRecord` 与 `EvidenceFragment`；
+- `IngestionRun`、coverage、quality 与失败摘要；
+- Source 与 Candidate 幂等冲突检测；
+- 持久化 Candidate Queue 与追加式 ReviewEvent；
+- Candidate 批准/驳回与权威节点/边写入的单事务闭环；
 - Python 3.11 / 3.12、PostgreSQL 16 和真实 stdio MCP CI。
 
 ## 安装与 Fixture 验收
@@ -186,9 +189,86 @@ me-system project-snapshot \
 
 实现与部署说明见 [`docs/implementation.md`](docs/implementation.md)。
 
+## 输入、候选与人工治理 CLI
+
+这些命令属于 ME-Brain / ME-Who 的内部构建管线，不向 Hermes MCP 暴露：
+
+```text
+source-register
+source-show
+candidate-submit
+candidate-list
+candidate-approve
+candidate-reject
+```
+
+### 1. 登记来源和证据片段
+
+`source.json`：
+
+```json
+{
+  "source": {
+    "schema_version": "source-record/0.1",
+    "source_id": "source:conversation:001",
+    "source_type": "agent_conversation",
+    "external_system": "hermes",
+    "external_id": "conversation-001",
+    "idempotency_key": "hermes:conversation-001:export-1",
+    "content_ref": "file:///data/conversation-001.json",
+    "content_sha256": "<64位sha256>",
+    "media_type": "application/json",
+    "occurred_at": "2026-07-23T10:00:00Z",
+    "ingested_at": "2026-07-23T12:00:00Z",
+    "sensitivity": "personal_private",
+    "metadata": {}
+  },
+  "fragments": []
+}
+```
+
+```bash
+me-system source-register --json source.json
+me-system source-show --source-id source:conversation:001
+```
+
+### 2. 提交、查看和审核 Candidate
+
+```bash
+me-system candidate-submit --json candidate.json
+
+me-system candidate-list \
+  --target-graph me_brain \
+  --source-id source:conversation:001
+
+me-system candidate-approve \
+  --change-id candidate:decision:001 \
+  --reviewer-id who:user:master \
+  --reason '用户明确确认'
+
+me-system candidate-reject \
+  --change-id candidate:preference:001 \
+  --reviewer-id who:user:master \
+  --reason '证据不足，暂不形成稳定事实'
+```
+
+审核操作会在一个数据库事务中完成：
+
+```text
+锁定 Candidate
+→ 验证仍为 pending
+→ 重建 GraphNode / GraphEdge
+→ 写权威对象和证据
+→ 更新 Candidate 状态
+→ 追加 ReviewEvent
+→ commit
+```
+
+任一步失败都会整笔回滚。
+
 ## Hermes 只读 MCP
 
-第一版工具：
+Hermes 仍然只能看到六个只读工具：
 
 ```text
 brain_resolve_project
@@ -218,11 +298,12 @@ me-system/
 │   ├── brain/          # ME-Brain 领域
 │   ├── who/            # ME-Who 领域
 │   ├── bridge/         # 显式跨图关系，不是第三个产品
-│   ├── persistence/    # 内部持久化
-│   ├── hermes/         # 内部 MCP 适配
+│   ├── evidence/       # 来源与证据契约
+│   ├── ingestion/      # 摄取状态、Candidate 和审核
+│   ├── persistence/    # PostgreSQL、迁移和 Repository
+│   ├── hermes/         # MCP 适配
 │   ├── contracts.py
 │   ├── query.py
-│   ├── review.py
 │   └── store.py
 ├── tests/
 ├── schemas/
@@ -231,8 +312,6 @@ me-system/
 ├── deploy/
 └── docs/
 ```
-
-后续 Source、Evidence 和 Ingestion 能力进入 `src/me_system/` 内部模块，不建立新产品或新数据库。
 
 ## 文档导航
 
@@ -246,17 +325,16 @@ me-system/
 - [ME-Who 本体](docs/specs/me-who-ontology-v0.1.md)
 - [推荐开发路径](docs/roadmap/recommended-development-path.md)
 
-## 当前开发顺序
+## 下一步
 
 ```text
-1. 统一 me_system 包                         当前 PR
-2. Source / Evidence / Candidate 持久化
-3. 增量 Manifest 与 Adapter versioning
-4. Agent Conversation Adapter
-5. 路径式 MCP 查询与影响分析
-6. Graph Report 与 Benchmark
-7. Markdown / Git / Zotero Adapter
-8. 社区与中心性分析
+1. 增量 Manifest 与 Adapter versioning
+2. Agent Conversation Adapter
+3. derivation_kind：EXPLICIT / RULE_DERIVED / MODEL_INFERRED / AMBIGUOUS
+4. 路径式 MCP 查询与影响分析
+5. Graph Report 与 Benchmark
+6. Markdown / Git / Zotero Adapter
+7. 社区与中心性分析
 ```
 
 在输入候选闭环和 Benchmark 稳定前，不优先开发大型图谱前端、复杂多 Agent Handoff、数字人格或任意图查询语言。
