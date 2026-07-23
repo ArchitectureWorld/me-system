@@ -1,4 +1,4 @@
-"""Persistent storage support for ME-System graph core."""
+"""Persistent storage used internally by ME-System."""
 
 from .database import create_database_engine, redact_database_url
 from .models import Base, EvidenceRefRecord, GraphObjectRecord, create_schema

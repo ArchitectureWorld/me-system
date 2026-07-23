@@ -1,4 +1,4 @@
-"""ME-System canonical dual-graph core."""
+"""ME-System: persistent ME-Brain and ME-Who graphs for AI agents."""
 
 from .contracts import (
     AuthorityLevel,

@@ -3,9 +3,9 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "me-core"
+name = "me-system"
 version = "0.1.0"
-description = "Canonical dual-graph contracts and query foundation for ME-System"
+description = "Persistent ME-Brain and ME-Who graph system for AI agents"
 requires-python = ">=3.11"
 dependencies = [
   "SQLAlchemy>=2.0,<2.1",
@@ -18,10 +18,10 @@ dependencies = [
 dev = ["pytest>=8", "jsonschema>=4.20"]
 
 [project.scripts]
-me-system = "me_core.cli:main"
-me-system-mcp = "me_core.hermes.mcp_server:main"
-me-graph = "me_core.cli:main"
-me-graph-mcp = "me_core.hermes.mcp_server:main"
+me-system = "me_system.cli:main"
+me-system-mcp = "me_system.hermes.mcp_server:main"
+me-graph = "me_system.cli:main"
+me-graph-mcp = "me_system.hermes.mcp_server:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
