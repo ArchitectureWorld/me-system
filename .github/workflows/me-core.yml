@@ -1,4 +1,4 @@
-name: ME-Core
+name: ME-System
 
 on:
   pull_request:
@@ -51,7 +51,7 @@ jobs:
       - name: Install package and test dependencies
         run: python -m pip install -q -e '.[dev]'
 
-      - name: Run core and pure Hermes tests
+      - name: Run shared runtime and pure Hermes tests
         run: >-
           pytest -q --tb=short
           --ignore=tests/test_mcp_server.py
