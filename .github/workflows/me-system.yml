@@ -1,4 +1,4 @@
-name: ME-System root package validation
+name: ME-System
 
 on:
   pull_request:
@@ -13,8 +13,23 @@ on:
       - "migrations/**"
       - "pyproject.toml"
       - "alembic.ini"
-      - "examples/graph/**"
-      - "deploy/postgres/**"
+      - "examples/**"
+      - "deploy/**"
+      - ".github/workflows/me-system.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "src/**"
+      - "tests/**"
+      - "schemas/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "alembic.ini"
+      - "examples/**"
+      - "deploy/**"
       - ".github/workflows/me-system.yml"
 
 permissions:
@@ -22,7 +37,6 @@ permissions:
 
 jobs:
   unit:
-    if: github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -63,7 +77,6 @@ jobs:
       - run: python -m compileall -q src
 
   postgres-e2e:
-    if: github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     services:
       postgres:
