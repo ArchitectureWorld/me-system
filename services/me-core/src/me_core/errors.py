@@ -1,9 +1,9 @@
 class GraphCoreError(Exception):
-    """Base error for ME-System graph core."""
+    """Base error for the single ME-Core runtime."""
 
 
 class ContractValidationError(GraphCoreError, ValueError):
-    """Raised when a graph contract is invalid."""
+    """Raised when a ME-Core contract is invalid."""
 
 
 class DuplicateGraphObjectError(GraphCoreError):
@@ -23,15 +23,15 @@ class CandidateReviewError(GraphCoreError, ValueError):
 
 
 class GraphStoreConfigurationError(GraphCoreError, ValueError):
-    """Raised when persistent graph storage configuration is invalid."""
+    """Raised when persistent ME-Core storage configuration is invalid."""
 
 
 class GraphStoreUnavailableError(GraphCoreError):
-    """Raised when persistent graph storage cannot complete an operation."""
+    """Raised when persistent ME-Core storage cannot complete an operation."""
 
 
 class GraphMigrationError(GraphCoreError):
-    """Raised when a graph database migration cannot be applied."""
+    """Raised when a ME-Core database migration cannot be applied."""
 
 
 class HermesConfigurationError(GraphCoreError, ValueError):
@@ -40,3 +40,23 @@ class HermesConfigurationError(GraphCoreError, ValueError):
 
 class ProjectAccessError(GraphCoreError, PermissionError):
     """Raised when an object is outside the configured Hermes project scope."""
+
+
+class SourceConflictError(GraphCoreError, ValueError):
+    """Raised when a source replay conflicts with immutable source identity."""
+
+
+class SourceNotFoundError(GraphCoreError, KeyError):
+    """Raised when a source ledger record does not exist."""
+
+
+class EvidenceConflictError(GraphCoreError, ValueError):
+    """Raised when evidence fragments conflict by ID, source, or ordinal."""
+
+
+class IngestionRunError(GraphCoreError, ValueError):
+    """Raised when an ingestion run transition is invalid."""
+
+
+class IngestionRunNotFoundError(GraphCoreError, KeyError):
+    """Raised when an ingestion run does not exist."""
