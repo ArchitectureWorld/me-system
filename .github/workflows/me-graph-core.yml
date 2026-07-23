@@ -67,10 +67,19 @@ jobs:
           cache-dependency-path: services/me-graph-core/pyproject.toml
 
       - name: Install package and test dependencies
-        run: python -m pip install -e '.[dev]'
+        run: python -m pip install -q -e '.[dev]'
 
-      - name: Run tests including PostgreSQL integration
-        run: pytest -q
+      - name: Run graph core and pure Hermes tests
+        run: >-
+          pytest -q --tb=short
+          --ignore=tests/test_mcp_server.py
+          --ignore=tests/test_mcp_stdio.py
+
+      - name: Run FastMCP tool surface tests
+        run: pytest -q --tb=short tests/test_mcp_server.py
+
+      - name: Run stdio MCP PostgreSQL end-to-end test
+        run: pytest -q --tb=short tests/test_mcp_stdio.py
 
       - name: Compile Python sources
         run: python -m compileall -q src
