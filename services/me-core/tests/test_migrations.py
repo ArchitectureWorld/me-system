@@ -10,11 +10,21 @@ from me_core.persistence.migrations import upgrade_database
 from me_core.persistence.models import Base
 
 
+EXPECTED_TABLES = {
+    "alembic_version",
+    "graph_objects",
+    "graph_evidence_refs",
+    "source_records",
+    "evidence_fragments",
+    "ingestion_runs",
+}
+
+
 def test_upgrade_database_creates_schema(tmp_path: Path) -> None:
     url = f"sqlite+pysqlite:///{tmp_path / 'graph.db'}"
     upgrade_database(url, production=False)
     names = set(inspect(create_engine(url)).get_table_names())
-    assert {"graph_objects", "graph_evidence_refs", "alembic_version"} <= names
+    assert names == EXPECTED_TABLES
 
 
 def test_upgrade_database_is_idempotent(tmp_path: Path) -> None:
