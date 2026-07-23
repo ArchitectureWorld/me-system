@@ -58,6 +58,45 @@ def _deduplicate_refs(
     return [unique[key] for key in sorted(unique)]
 
 
+def _restrict_brain_slice(
+    value: dict[str, object],
+    members: frozenset[str],
+    *,
+    summary: str | None = None,
+) -> dict[str, object]:
+    raw_nodes = value.get("nodes", [])
+    raw_edges = value.get("edges", [])
+    nodes = [
+        node
+        for node in raw_nodes
+        if isinstance(node, dict)
+        and node.get("id") in members
+        and node.get("graph") == "me_brain"
+    ]
+    node_ids = {str(node["id"]) for node in nodes}
+    edges = [
+        edge
+        for edge in raw_edges
+        if isinstance(edge, dict)
+        and edge.get("graph") == "me_brain"
+        and edge.get("from_id") in node_ids
+        and edge.get("to_id") in node_ids
+    ]
+    refs: list[dict[str, object]] = []
+    for item in [*nodes, *edges]:
+        item_refs = item.get("source_refs", [])
+        if isinstance(item_refs, list):
+            refs.extend(ref for ref in item_refs if isinstance(ref, dict))
+    restricted = dict(value)
+    restricted["graph"] = "me_brain"
+    restricted["nodes"] = nodes
+    restricted["edges"] = edges
+    restricted["evidence_handles"] = _deduplicate_refs(refs)
+    if summary is not None:
+        restricted["summary"] = summary
+    return restricted
+
+
 class HermesReadOnlyTools:
     """Pure read-only tool service used by FastMCP and contract tests."""
 
@@ -121,28 +160,11 @@ class HermesReadOnlyTools:
                 depth=depth,
                 edge_types=set(edge_types) if edge_types else None,
             ).to_dict()
-            nodes = [
-                node
-                for node in value["nodes"]
-                if node["id"] in members and node["graph"] == "me_brain"
-            ]
-            node_ids = {node["id"] for node in nodes}
-            edges = [
-                edge
-                for edge in value["edges"]
-                if edge["graph"] == "me_brain"
-                and edge["from_id"] in node_ids
-                and edge["to_id"] in node_ids
-            ]
-            refs: list[dict[str, object]] = []
-            for item in [*nodes, *edges]:
-                refs.extend(item.get("source_refs", []))
-            value["graph"] = "me_brain"
-            value["nodes"] = nodes
-            value["edges"] = edges
-            value["evidence_handles"] = _deduplicate_refs(refs)
-            value["summary"] = f"项目范围内从 {node_id} 展开 {depth} 层"
-            return value
+            return _restrict_brain_slice(
+                value,
+                members,
+                summary=f"项目范围内从 {node_id} 展开 {depth} 层",
+            )
 
         return _safe(operation)
 
@@ -151,7 +173,9 @@ class HermesReadOnlyTools:
     ) -> dict[str, object]:
         def operation() -> dict[str, object]:
             self._guard.require_member(project_id, decision_id)
-            return self._query.trace_decision(decision_id).to_dict()
+            members = self._guard.project_member_ids(project_id)
+            value = self._query.trace_decision(decision_id).to_dict()
+            return _restrict_brain_slice(value, members)
 
         return _safe(operation)
 
