@@ -6,65 +6,37 @@ on:
       - "README.md"
       - "docs/**"
       - "services/me-core/**"
+      - "src/**"
+      - "tests/**"
+      - "schemas/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "alembic.ini"
       - "examples/graph/**"
       - "deploy/postgres/**"
-      - ".github/workflows/me-core.yml"
+      - ".github/workflows/**"
   push:
     branches:
       - main
     paths:
       - "README.md"
       - "docs/**"
-      - "services/me-core/**"
+      - "src/**"
+      - "tests/**"
+      - "schemas/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "alembic.ini"
       - "examples/graph/**"
       - "deploy/postgres/**"
-      - ".github/workflows/me-core.yml"
+      - ".github/workflows/me-system.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  unit:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - "3.11"
-          - "3.12"
-
-    defaults:
-      run:
-        working-directory: services/me-core
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: services/me-core/pyproject.toml
-
-      - name: Install package and test dependencies
-        run: python -m pip install -q -e '.[dev]'
-
-      - name: Run shared runtime and pure Hermes tests
-        run: >-
-          pytest -q --tb=short
-          --ignore=tests/test_mcp_server.py
-          --ignore=tests/test_mcp_stdio.py
-          --ignore=tests/test_postgres_integration.py
-
-      - name: Verify FastMCP tool registration
-        run: pytest -q --tb=short tests/test_mcp_server.py
-
-      - name: Compile Python sources
-        run: python -m compileall -q src
-
-  postgres-e2e:
+  refactor:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -80,30 +52,277 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
-
-    defaults:
-      run:
-        working-directory: services/me-core
-
     env:
       ME_GRAPH_TEST_POSTGRES_URL: postgresql+psycopg://me_graph:test-password@127.0.0.1:5432/me_graph_test
-
     steps:
-      - name: Check out repository
+      - name: Check out feature branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Apply physical package migration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          from pathlib import Path
+          import shutil
+
+          root = Path.cwd()
+          old = root / "services" / "me-core"
+          if not old.exists():
+              print("Unified package already applied.")
+              raise SystemExit(0)
+
+          def move(src: Path, dst: Path) -> None:
+              dst.parent.mkdir(parents=True, exist_ok=True)
+              if dst.exists():
+                  if dst.is_dir():
+                      shutil.rmtree(dst)
+                  else:
+                      dst.unlink()
+              shutil.move(str(src), str(dst))
+
+          move(old / "README.md", root / "docs" / "implementation.md")
+          move(old / "pyproject.toml", root / "pyproject.toml")
+          move(old / "alembic.ini", root / "alembic.ini")
+          move(old / "migrations", root / "migrations")
+          move(old / "schemas", root / "schemas")
+          move(old / "tests", root / "tests")
+          move(old / "src" / "me_core", root / "src" / "me_system")
+
+          old_ignore = old / ".gitignore"
+          root_ignore = root / ".gitignore"
+          if old_ignore.exists():
+              existing = root_ignore.read_text(encoding="utf-8") if root_ignore.exists() else ""
+              additions = old_ignore.read_text(encoding="utf-8")
+              root_ignore.write_text(
+                  existing.rstrip() + "\n\n# Python build artifacts\n" + additions.strip() + "\n",
+                  encoding="utf-8",
+              )
+
+          shutil.rmtree(old)
+          services = root / "services"
+          if services.exists() and not any(services.iterdir()):
+              services.rmdir()
+
+          package = root / "src" / "me_system"
+          adapters = package / "adapters"
+          adapters.mkdir(parents=True, exist_ok=True)
+          (adapters / "__init__.py").write_text(
+              '"""External adapters for ME-System."""\n', encoding="utf-8"
+          )
+          move(package / "hermes", adapters / "hermes")
+
+          for domain, doc in {
+              "brain": "ME-Brain project and knowledge graph domain.",
+              "who": "ME-Who user understanding graph domain.",
+              "bridge": "Explicit cross-domain relations; not a third graph product.",
+          }.items():
+              target = package / domain
+              target.mkdir(parents=True, exist_ok=True)
+              (target / "__init__.py").write_text(f'"""{doc}"""\n', encoding="utf-8")
+
+          for base in [package, root / "tests", root / "migrations"]:
+              for path in base.rglob("*.py"):
+                  text = path.read_text(encoding="utf-8")
+                  text = text.replace("me_core.hermes", "me_system.adapters.hermes")
+                  text = text.replace("me_core", "me_system")
+                  if adapters / "hermes" in path.parents:
+                      text = text.replace("from ..", "from ...")
+                  if base == root / "tests":
+                      text = text.replace(
+                          'Path(__file__).resolve().parents[3] / "examples"',
+                          'Path(__file__).resolve().parents[1] / "examples"',
+                      )
+                  path.write_text(text, encoding="utf-8")
+
+          old_test = root / "tests" / "test_me_core_naming.py"
+          if old_test.exists():
+              new_test = root / "tests" / "test_system_identity.py"
+              new_test.write_text(
+                  '''from pathlib import Path\nimport tomllib\n\n\ndef test_distribution_and_commands_use_me_system_names() -> None:\n    data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))\n    assert data["project"]["name"] == "me-system"\n    scripts = data["project"]["scripts"]\n    assert scripts["me-system"] == "me_system.cli:main"\n    assert scripts["me-system-mcp"] == "me_system.adapters.hermes.mcp_server:main"\n    assert scripts["me-graph"] == "me_system.cli:main"\n    assert scripts["me-graph-mcp"] == "me_system.adapters.hermes.mcp_server:main"\n''',
+                  encoding="utf-8",
+              )
+              old_test.unlink()
+
+          (root / "tests" / "test_package_identity.py").write_text(
+              '''from pathlib import Path\n\n\ndef test_canonical_package_imports() -> None:\n    import me_system\n\n    assert me_system.__doc__ is not None\n\n\ndef test_active_runtime_has_no_third_core_package() -> None:\n    assert not Path("services/me-core").exists()\n    assert not Path("services/me-graph-core").exists()\n    assert not Path("src/me_core").exists()\n    assert Path("src/me_system/brain").is_dir()\n    assert Path("src/me_system/who").is_dir()\n''',
+              encoding="utf-8",
+          )
+
+          pyproject = root / "pyproject.toml"
+          text = pyproject.read_text(encoding="utf-8")
+          text = text.replace('name = "me-core"', 'name = "me-system"')
+          text = text.replace(
+              'description = "Canonical dual-graph contracts and query foundation for ME-System"',
+              'description = "Persistent ME-Brain and ME-Who graph system for AI agents"',
+          )
+          text = text.replace('me-system = "me_system.cli:main"', 'me-system = "me_system.cli:main"')
+          text = text.replace(
+              'me-system-mcp = "me_system.hermes.mcp_server:main"',
+              'me-system-mcp = "me_system.adapters.hermes.mcp_server:main"',
+          )
+          text = text.replace('me-graph = "me_system.cli:main"', 'me-graph = "me_system.cli:main"')
+          text = text.replace(
+              'me-graph-mcp = "me_system.hermes.mcp_server:main"',
+              'me-graph-mcp = "me_system.adapters.hermes.mcp_server:main"',
+          )
+          pyproject.write_text(text, encoding="utf-8")
+
+          active_paths = [
+              root / "README.md",
+              root / "docs" / "architecture-status.md",
+              root / "docs" / "00-product-and-architecture-overview.md",
+              root / "docs" / "roadmap" / "recommended-development-path.md",
+              root / "docs" / "implementation.md",
+              root / "docs" / "superpowers" / "specs" / "2026-07-23-source-ledger-candidate-persistence-design.md",
+              root / "docs" / "adr" / "ADR-0005-single-graph-kernel.md",
+              root / "docs" / "competitors" / "codebase-memory-architecture-review.md",
+              root / "integrations" / "hermes" / "README.md",
+              root / "integrations" / "hermes" / "config.example.yaml",
+              root / "integrations" / "hermes" / "ME_SYSTEM_BOOTSTRAP.md",
+          ]
+          replacements = [
+              ("services/me-core/src/me_core", "src/me_system"),
+              ("services/me-core/tests", "tests"),
+              ("services/me-core/schemas", "schemas"),
+              ("services/me-core/migrations", "migrations"),
+              ("services/me-core/pyproject.toml", "pyproject.toml"),
+              ("services/me-core/README.md", "docs/implementation.md"),
+              ("services/me-core", "repository root"),
+              ("me_core.hermes", "me_system.adapters.hermes"),
+              ("me_core", "me_system"),
+              ("me-core", "me-system"),
+              ("ME-Core", "ME-System implementation"),
+              ("ME-Graph Core", "ME-System implementation"),
+          ]
+          for path in active_paths:
+              if path.exists():
+                  text = path.read_text(encoding="utf-8")
+                  for old_text, new_text in replacements:
+                      text = text.replace(old_text, new_text)
+                  path.write_text(text, encoding="utf-8")
+
+          readme = root / "README.md"
+          text = readme.read_text(encoding="utf-8")
+          transitional = (
+              "> 当前代码仍位于历史路径 `repository root/`。该路径只是过渡实现位置，不代表第三个产品；"
+              "下一次代码整理会迁移到中性的 `shared/` 与 `me_system` 包结构。"
+          )
+          text = text.replace(
+              transitional,
+              "> 当前运行代码已经收敛到根级 `src/me_system/`。ME-Brain 与 ME-Who 是仅有的两个图谱领域；其余目录均为内部实现职责。",
+          )
+          text = text.replace("cd repository root", "cd <me-system-repository>")
+          readme.write_text(text, encoding="utf-8")
+
+          migration_note = root / "docs" / "migrations" / "2026-07-23-unified-package.md"
+          migration_note.parent.mkdir(parents=True, exist_ok=True)
+          migration_note.write_text(
+              '''# Unified ME-System Package Migration\n\nThe historical runtime paths `services/me-graph-core/`, `services/me-core/`, and Python packages `me_graph_core` / `me_core` were transitional implementation names.\n\nThe canonical runtime is now `src/me_system/`. ME-Brain and ME-Who are the only product graph domains. Persistence, evidence, ingestion, review, query, and MCP are internal ME-System responsibilities.\n''',
+              encoding="utf-8",
+          )
+
+          # Replace the transitional workflow with root-level CI.
+          new_workflow = root / ".github" / "workflows" / "me-system.yml"
+          new_workflow.write_text(
+              '''name: ME-System\n\non:\n  pull_request:\n    paths:\n      - "README.md"\n      - "docs/**"\n      - "src/**"\n      - "tests/**"\n      - "schemas/**"\n      - "migrations/**"\n      - "pyproject.toml"\n      - "alembic.ini"\n      - "examples/graph/**"\n      - "deploy/postgres/**"\n      - ".github/workflows/me-system.yml"\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  unit:\n    runs-on: ubuntu-latest\n    strategy:\n      fail-fast: false\n      matrix:\n        python-version: ["3.11", "3.12"]\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: ${{ matrix.python-version }}\n          cache: pip\n          cache-dependency-path: pyproject.toml\n      - run: python -m pip install -q -e '.[dev]'\n      - run: pytest -q --tb=short --ignore=tests/test_mcp_stdio.py --ignore=tests/test_postgres_integration.py\n      - run: python -m compileall -q src\n\n  postgres-e2e:\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:16\n        env:\n          POSTGRES_DB: me_graph_test\n          POSTGRES_USER: me_graph\n          POSTGRES_PASSWORD: test-password\n        ports: ["5432:5432"]\n        options: >-\n          --health-cmd "pg_isready -U me_graph -d me_graph_test"\n          --health-interval 5s\n          --health-timeout 5s\n          --health-retries 12\n    env:\n      ME_GRAPH_TEST_POSTGRES_URL: postgresql+psycopg://me_graph:test-password@127.0.0.1:5432/me_graph_test\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: "3.12"\n          cache: pip\n          cache-dependency-path: pyproject.toml\n      - run: python -m pip install -q -e '.[dev]'\n      - run: pytest -q --tb=short tests/test_postgres_integration.py tests/test_mcp_stdio.py\n''',
+              encoding="utf-8",
+          )
+
+          for temporary in [
+              root / ".github" / "workflows" / "me-core.yml",
+              root / ".github" / "workflows" / "apply-unify-refactor.yml",
+              root / ".github" / "workflows" / "export-unify-workspace.yml",
+          ]:
+              if temporary.exists() and temporary != new_workflow:
+                  temporary.unlink()
+          PY
+
+      - name: Install root package
+        run: python -m pip install -e '.[dev]'
+
+      - name: Run complete test suite
+        run: pytest -q --tb=short
+
+      - name: Compile sources
+        run: python -m compileall -q src
+
+      - name: Verify canonical package and commands
+        run: |
+          python -c 'import me_system; from me_system.adapters.hermes.mcp_server import main; print(me_system.__name__)'
+          me-system --help >/dev/null
+
+      - name: Commit and push migration
+        shell: bash
+        run: |
+          git config user.name "ArchitectureWorld"
+          git config user.email "140295054+ArchitectureWorld@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "refactor: unify runtime under me_system package"
+          git push origin HEAD:${{ github.head_ref }}
+
+  unit:
+    needs: refactor
+    if: always() && (needs.refactor.result == 'success' || needs.refactor.result == 'skipped')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: services/me-core/pyproject.toml
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -q -e '.[dev]'
+      - run: pytest -q --tb=short --ignore=tests/test_mcp_stdio.py --ignore=tests/test_postgres_integration.py
+      - run: python -m compileall -q src
 
-      - name: Install package and test dependencies
-        run: python -m pip install -q -e '.[dev]'
-
-      - name: Run PostgreSQL GraphStore integration
-        run: pytest -q --tb=short tests/test_postgres_integration.py
-
-      - name: Run stdio MCP PostgreSQL end-to-end test
-        run: pytest -q --tb=short tests/test_mcp_stdio.py
+  postgres-e2e:
+    needs: refactor
+    if: always() && (needs.refactor.result == 'success' || needs.refactor.result == 'skipped')
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: me_graph_test
+          POSTGRES_USER: me_graph
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U me_graph -d me_graph_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ME_GRAPH_TEST_POSTGRES_URL: postgresql+psycopg://me_graph:test-password@127.0.0.1:5432/me_graph_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -q -e '.[dev]'
+      - run: pytest -q --tb=short tests/test_postgres_integration.py tests/test_mcp_stdio.py
