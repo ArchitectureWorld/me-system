@@ -19,20 +19,34 @@
 
 目标：Hermes 能从一句“继续推进 lighting-platform”恢复项目。
 
-任务：
+### 已完成：PostgreSQL GraphStore
 
-1. 将人工示例图迁移到 PostgreSQL GraphStore；
-2. 实现项目解析与 ID Resolve；
-3. 暴露只读 Graph Query API；
-4. 实现 Hermes MCP Server；
-5. 对比全文件探索与 GraphSlice 的 Token、延迟和准确度。
+- SQLAlchemy 2.0 持久化实现；
+- PostgreSQL + psycopg 3；
+- 全局节点/边 ID；
+- 有序 EvidenceRef；
+- 原子写入和事务回滚；
+- ME-Brain、ME-Who 与 Bridge 约束；
+- Alembic 迁移；
+- 数据库 CLI；
+- 内存 Store 与持久化 Store 查询一致性；
+- Python 3.11 / 3.12 + PostgreSQL CI。
 
-验收：
+### 下一步
+
+1. 实现项目名称、工作目录和外部 ID Resolve；
+2. 暴露只读 Graph Query API；
+3. 实现 Hermes MCP Server；
+4. 对比全文件探索与 GraphSlice 的 Token、延迟和准确度。
+
+### 验收
 
 - 当前决策不混入过期方案；
 - 阻塞任务和问题可查询；
 - 决策可以返回证据；
-- Hermes 不直接扫描全部文件。
+- 数据跨进程和重启保持；
+- Hermes 不直接扫描全部文件；
+- Hermes 不直接连接数据库。
 
 ## Phase 2：输入和候选图谱
 
@@ -55,6 +69,13 @@ CandidateGraphChange
 ```
 
 不直接写入权威图谱。
+
+同时补充：
+
+- pending Candidate 持久化；
+- 审核日志；
+- 批量导入事务；
+- 失败重试和幂等键。
 
 ## Phase 3：最小 ME-Who
 
@@ -85,7 +106,8 @@ ME-Who Task Profile
 - 批准、驳回和修改；
 - 版本和替代；
 - 审计日志；
-- ME-Who 敏感信息治理。
+- ME-Who 敏感信息治理；
+- Agent 字段级权限过滤。
 
 第一版可以是简单 Web 或 Obsidian 投影，不建设大型图谱画布。
 
@@ -122,9 +144,15 @@ Zotero 与 Obsidian 代码归入本领域。
 Brief / Option / DesignDecision / Drawing / Model / Review / Revision
 ```
 
+## 数据库演进原则
+
+当前权威存储固定为 PostgreSQL。只有当真实多跳查询、图算法或规模指标证明关系表不足时，才评估 PostgreSQL 图扩展或独立图数据库。
+
+任何新存储方案必须继续实现同一个 `GraphStore`，并通过与 PostgreSQL 相同的行为契约和 GraphSlice 对照测试。
+
 ## 暂停开发
 
-在 Phase 1 通过前，不优先投入：
+在 Hermes 只读闭环通过前，不优先投入：
 
 - 完整多 Agent Handoff 平台；
 - 全格式万能文档标准；
