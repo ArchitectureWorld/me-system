@@ -14,6 +14,8 @@ from .contracts import (
     Sensitivity,
     TemporalStatus,
 )
+from .persistence.store import SqlAlchemyGraphStore, create_postgres_graph_store
+from .store import GraphStore, InMemoryGraphStore
 
 __all__ = [
     "AuthorityLevel",
@@ -25,7 +27,11 @@ __all__ = [
     "GraphNamespace",
     "GraphNode",
     "GraphSlice",
+    "GraphStore",
+    "InMemoryGraphStore",
     "ReviewStatus",
     "Sensitivity",
+    "SqlAlchemyGraphStore",
     "TemporalStatus",
+    "create_postgres_graph_store",
 ]
