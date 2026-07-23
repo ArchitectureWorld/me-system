@@ -15,6 +15,9 @@ on:
       - "alembic.ini"
       - "examples/**"
       - "deploy/**"
+      - ".dockerignore"
+      - "体验.*"
+      - "停止体验.*"
       - ".github/workflows/me-system.yml"
   push:
     branches:
@@ -30,6 +33,9 @@ on:
       - "alembic.ini"
       - "examples/**"
       - "deploy/**"
+      - ".dockerignore"
+      - "体验.*"
+      - "停止体验.*"
       - ".github/workflows/me-system.yml"
 
 permissions:
@@ -61,10 +67,11 @@ jobs:
             --ignore=tests/test_mcp_stdio.py \
             --ignore=tests/compat/runtime/test_postgres_integration.py \
             --ignore=tests/test_ingestion_postgres_e2e.py \
+            --ignore=tests/test_experience_postgres_e2e.py \
             > pytest-unit.log 2>&1
           status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
-          tail -n 160 pytest-unit.log
+          tail -n 200 pytest-unit.log
           exit 0
       - name: Upload unit test log
         if: always()
@@ -103,7 +110,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: python -m pip install -q -e '.[dev]'
-      - name: Run PostgreSQL graph, ingestion, and stdio MCP end-to-end tests
+      - name: Run PostgreSQL graph, ingestion, one-click experience, and stdio MCP end-to-end tests
         id: e2e_tests
         shell: bash
         run: |
@@ -111,11 +118,12 @@ jobs:
           pytest -q --tb=short \
             tests/compat/runtime/test_postgres_integration.py \
             tests/test_ingestion_postgres_e2e.py \
+            tests/test_experience_postgres_e2e.py \
             tests/test_mcp_stdio.py \
             > pytest-e2e.log 2>&1
           status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
-          tail -n 160 pytest-e2e.log
+          tail -n 240 pytest-e2e.log
           exit 0
       - name: Upload end-to-end test log
         if: always()
@@ -126,3 +134,60 @@ jobs:
       - name: Fail when end-to-end tests failed
         if: steps.e2e_tests.outputs.status != '0'
         run: exit 1
+
+  docker-experience:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the actual Linux one-click launcher
+        run: ./体验.sh
+      - name: Verify initial and rerun browser acceptance reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS http://localhost:8765/healthz > health.json
+          curl -fsS http://localhost:8765/api/report > experience-report-first.json
+          curl -fsS -X POST http://localhost:8765/api/run > experience-report-rerun.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          first = json.loads(Path("experience-report-first.json").read_text())
+          rerun = json.loads(Path("experience-report-rerun.json").read_text())
+
+          for payload in (first, rerun):
+              assert payload["status"] == "pass", payload
+              assert len(payload["checks"]) == 8, payload
+              assert all(item["status"] == "pass" for item in payload["checks"]), payload
+              assert payload["passed_count"] == 8, payload
+              assert payload["failed_count"] == 0, payload
+              assert payload["skipped_count"] == 0, payload
+              assert len(payload["technical"]["tool_names"]) == 6, payload
+
+          assert first["run_id"] != rerun["run_id"], (first, rerun)
+          assert first["technical"]["source_id"] != rerun["technical"]["source_id"]
+          assert first["technical"]["brain_task_id"] != rerun["technical"]["brain_task_id"]
+          assert first["technical"]["who_rule_id"] != rerun["technical"]["who_rule_id"]
+          print(json.dumps({
+              "first_run_id": first["run_id"],
+              "rerun_id": rerun["run_id"],
+              "status": "pass",
+              "passed_count_each": 8,
+          }, ensure_ascii=False))
+          PY
+      - name: Upload browser acceptance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: one-click-experience-report
+          path: |
+            health.json
+            experience-report-first.json
+            experience-report-rerun.json
+          if-no-files-found: warn
+      - name: Show experience logs on failure
+        if: failure()
+        run: docker compose -f deploy/experience/compose.yml logs --tail=240
+      - name: Stop and remove isolated experience stack
+        if: always()
+        run: docker compose -f deploy/experience/compose.yml down --volumes --remove-orphans
