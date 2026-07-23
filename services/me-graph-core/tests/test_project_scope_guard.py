@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,13 +19,17 @@ FIXTURE = (
 PROJECT = "brain:project:lighting-platform"
 
 
+def store() -> InMemoryGraphStore:
+    value = InMemoryGraphStore()
+    load_graph_fixture(FIXTURE, value)
+    return value
+
+
 def guard(
     allowed: frozenset[str] | None = frozenset({PROJECT}),
 ) -> ProjectScopeGuard:
-    store = InMemoryGraphStore()
-    load_graph_fixture(FIXTURE, store)
     return ProjectScopeGuard(
-        store,
+        store(),
         allowed_project_ids=allowed,
         membership_depth=3,
     )
@@ -58,6 +63,52 @@ def test_bridge_and_who_objects_are_never_project_members() -> None:
             PROJECT,
             "edge:bridge:user-participates-lighting",
         )
+
+
+def test_arbitrary_relation_does_not_import_another_project_node() -> None:
+    graph = store()
+    current_project = graph.get_node(PROJECT)
+    current_decision = graph.get_node("brain:decision:radiance-primary")
+    ownership = graph.get_edge("edge:project-has-radiance")
+    history = graph.get_edge("edge:radiance-supersedes-cycles")
+
+    other_project = replace(
+        current_project,
+        id="brain:project:other",
+        label="other",
+        properties={"aliases": ["other"]},
+    )
+    other_decision = replace(
+        current_decision,
+        id="brain:decision:other",
+        label="Other project decision",
+    )
+    graph.add_node(other_project)
+    graph.add_node(other_decision)
+    graph.add_edge(
+        replace(
+            ownership,
+            id="edge:other-has-decision",
+            from_id=other_project.id,
+            to_id=other_decision.id,
+        )
+    )
+    graph.add_edge(
+        replace(
+            history,
+            id="edge:cross-project-history",
+            from_id=current_decision.id,
+            to_id=other_decision.id,
+        )
+    )
+
+    value = ProjectScopeGuard(
+        graph,
+        allowed_project_ids=frozenset({PROJECT}),
+        membership_depth=3,
+    )
+    with pytest.raises(ProjectAccessError):
+        value.require_member(PROJECT, other_decision.id)
 
 
 def test_depth_limit_is_enforced() -> None:
