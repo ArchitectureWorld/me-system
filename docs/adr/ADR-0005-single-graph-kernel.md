@@ -1,13 +1,13 @@
-# ADR-0005：ME-System 仅保留 ME-Brain 与 ME-Who 两个产品图谱
+# ADR-0005：一个 ME-System，仅有 ME-Brain 与 ME-Who 两个图谱领域
 
 - 状态：Accepted
 - 日期：2026-07-23
-- 参考：Codebase-Memory MCP
 - 上位决策：ADR-0004 双权威图谱
+- 参考：Codebase-Memory、Graphify
 
 ## 决策
 
-ME-System 对外和对内的产品模型都只包含两个图谱：
+ME-System 是唯一产品和唯一运行主体。其内部只有两个权威图谱领域：
 
 ```text
 ME-System
@@ -20,192 +20,156 @@ ME-System
 
 不再定义第三个产品、第三张业务图谱或第三个“Core”品牌。
 
-现有 `services/me-graph-core/` 与 Python 包 `me_graph_core` 是早期实现路径，不代表第三个产品，但名称容易造成误解。后续迁移为无产品身份的共享实现：
+以下能力均为 ME-System 内部职责，不拥有平级产品身份：
+
+- Source / Evidence；
+- Ingestion / Candidate；
+- Review；
+- Persistence；
+- Query；
+- Bridge；
+- MCP / Hermes Adapter。
+
+## 统一代码身份
+
+运行代码统一为：
 
 ```text
-me-system/
-├── me-brain/
-├── me-who/
-├── shared/
-└── integrations/
+pyproject.toml
+src/me_system/
+tests/
+schemas/
+migrations/
 ```
 
-建议 Python 包收敛为：
+分发包、导入包和命令：
 
 ```text
-me_system.brain
-me_system.who
-me_system.shared
-me_system.integrations
+Distribution: me-system
+Import:       me_system
+CLI:          me-system
+MCP:          me-system-mcp
 ```
 
-共享代码只解决技术复用，不拥有独立产品定位。
+不再保留活动实现身份：
 
-## Codebase-Memory 参考原则
+```text
+services/me-graph-core
+services/me-core
+me_graph_core
+me_core
+me-graph
+me-graph-mcp
+```
 
-Codebase-Memory 的核心做法是：先把代码库构造成持久化结构图谱，再由 Agent 通过 MCP 进行结构查询；后端不负责聊天回答，Agent 承担自然语言理解和工具选择。
+历史名称仅存在于 Git 历史和迁移说明中。
 
-ME-Brain 与 ME-Who 都采用这一模式：
+## Codebase-Memory 与 Graphify 参考原则
+
+两个图谱都采用相同运行模式：
 
 ```text
 原始来源
 → 确定性标准化 / 可审计抽取
-→ 结构化节点与关系候选
-→ 持久化图谱
+→ 证据片段
+→ 候选节点和关系
+→ 审核进入持久化图谱
 → 类型化查询
 → MCP / CLI
 → Agent 解释和执行
 ```
 
-### 共同吸收
+共同吸收：
 
-1. **Graph first**：Agent 默认读取结构图谱，不反复扫描全部原始资料；
+1. **Graph first**：Agent 默认读取结构图谱，不反复扫描全部资料；
 2. **Persistent graph**：图谱跨会话和重启保存；
-3. **Multi-pass indexing**：不同 Pass 分别负责发现、标准化、实体、关系、冲突和质量；
-4. **Typed MCP tools**：工具表达领域查询，不提供泛化聊天接口；
-5. **Compact first**：默认返回紧凑结构，需要时再下钻证据和原文；
-6. **CLI/MCP parity**：CLI 与 MCP 复用同一应用服务；
-7. **Status and coverage**：明确索引完成度、跳过内容和质量问题；
-8. **No embedded answer LLM**：模型可以参与候选抽取，但不成为权威事实源。
+3. **Multi-stage indexing**：发现、标准化、证据、候选、冲突和质量分别处理；
+4. **Typed MCP tools**：工具表达领域问题，不提供泛化聊天接口；
+5. **Compact first**：默认返回紧凑子图，需要时再下钻证据；
+6. **Path explanation**：答案可以沿节点、关系和证据路径解释；
+7. **Incremental update**：通过哈希、Manifest 和 Adapter 版本只处理变化内容；
+8. **CLI / MCP parity**：CLI 与 MCP 复用同一应用服务；
+9. **Status / coverage**：明确未处理、部分覆盖、失败和歧义范围；
+10. **Agent as intelligence layer**：模型可以生成候选，但不是未经审核的权威事实源。
 
-## ME-Brain 的 Codebase-Memory 映射
-
-Codebase-Memory 以 `Project / File / Class / Function / CALLS / IMPORTS` 等结构表达代码库。
-
-ME-Brain 用相同方法表达项目世界：
+## ME-Brain 的映射
 
 ### 节点
 
 ```text
-Project
-Workstream
-Requirement
-Decision
-Task
-Issue
-Constraint
-Artifact
-Experiment
-Document
-Person
-Evidence
+Project / Workstream / Requirement / Decision / Task / Issue
+Constraint / Artifact / Experiment / Document / Person / Evidence
 ```
 
 ### 关系
 
 ```text
-HAS_REQUIREMENT
-HAS_DECISION
-HAS_TASK
-HAS_ISSUE
-HAS_ARTIFACT
-SUPERSEDES
-SATISFIES
-DEPENDS_ON
-BLOCKS
-IMPLEMENTS
-PRODUCES
-SUPPORTED_BY
+HAS_REQUIREMENT / HAS_DECISION / HAS_TASK / HAS_ISSUE
+HAS_ARTIFACT / SUPERSEDES / SATISFIES / DEPENDS_ON
+BLOCKS / IMPLEMENTS / PRODUCES / SUPPORTED_BY
 ```
 
-### 主要作用
+### 作用
 
-- 快速恢复项目当前状态；
-- 区分当前决策和历史决策；
-- 查询任务、问题和阻塞关系；
-- 分析成果、需求和决策之间的影响；
-- 在有限 Token 下返回任务相关子图；
-- 必要时回到原始证据。
+- 恢复项目当前状态；
+- 区分当前和历史决策；
+- 查询任务、问题和阻塞；
+- 分析成果、需求和决策影响；
+- 按任务返回小子图；
+- 沿证据路径下钻原文。
 
-## ME-Who 的 Codebase-Memory 映射
-
-ME-Who 同样不是“用户摘要文件”，而是结构化图谱：
+## ME-Who 的映射
 
 ### 节点
 
 ```text
-User
-Role
-Capability
-Preference
-CollaborationRule
-Goal
-ProjectRole
-Experience
-Evidence
+User / Role / Capability / Preference / CollaborationRule
+Goal / ProjectRole / Experience / Evidence
 ```
 
 ### 关系
 
 ```text
-HAS_ROLE
-HAS_CAPABILITY
-PREFERS
-HAS_COLLABORATION_RULE
-HAS_GOAL
-PARTICIPATES_IN
-APPLIES_TO
-SUPERSEDES
-CONFIRMED_BY
-SUPPORTED_BY
+HAS_ROLE / HAS_CAPABILITY / PREFERS / HAS_COLLABORATION_RULE
+HAS_GOAL / PARTICIPATES_IN / APPLIES_TO / SUPERSEDES
+CONFIRMED_BY / SUPPORTED_BY
 ```
 
-### 主要作用
+### 作用
 
-- 让 Agent 获取任务相关的用户背景；
-- 根据项目、任务类型和 Agent 身份裁剪协作规则；
-- 区分用户明确事实、行为证据和系统推断；
+- 返回任务相关用户背景；
+- 按项目、任务和 Agent 裁剪协作规则；
+- 区分明确事实、行为证据和推断；
 - 记录偏好随时间和场景变化；
-- 减少重复询问和错误协作方式；
 - 防止无关 Agent 读取完整个人图谱。
 
-## 两个图谱的共同实现，但不是第三个产品
+## Bridge 的边界
+
+Bridge 只是显式跨领域关系 namespace，不是第三张产品图谱：
 
 ```text
-me-system/
-├── me-brain/
-│   ├── ontology/
-│   ├── passes/
-│   └── queries/
-├── me-who/
-│   ├── ontology/
-│   ├── passes/
-│   └── queries/
-├── shared/
-│   ├── contracts/
-│   ├── graph/
-│   ├── evidence/
-│   ├── ingestion/
-│   ├── persistence/
-│   ├── permissions/
-│   └── query/
-└── integrations/
-    ├── mcp/
-    ├── hermes/
-    └── pi/
+who:user:master
+  └── PARTICIPATES_IN
+        └── brain:project:lighting-platform
 ```
 
-`shared/` 中的能力包括：
+Bridge 必须：
 
-- GraphNode / GraphEdge / GraphSlice；
-- SourceRecord / EvidenceFragment；
-- CandidateGraphChange；
-- PostgreSQL 持久化；
-- 时间、来源、权限和审核；
-- MCP 与 CLI 共同调用的应用服务。
-
-它们不形成新的产品名称。
+- 显式建立；
+- 单独授权；
+- 不让 ME-Brain 工具读取 ME-Who 私有节点；
+- 不让 ME-Who 推断修改项目事实。
 
 ## MCP 边界
 
-MCP 只暴露两个图谱域的工具：
+MCP 仅暴露两个领域的工具：
 
 ```text
 brain_*
 who_*
 ```
 
-例如：
+当前：
 
 ```text
 brain_resolve_project
@@ -216,63 +180,45 @@ brain_get_evidence
 who_get_task_profile
 ```
 
-后续工具仍按图谱域命名，不增加 `core_*`、`context_*` 或 `source_*` 产品级工具前缀。
-
-MCP Adapter：
+后续可以增加路径与影响分析工具，但仍然：
 
 - 不定义图谱 Schema；
 - 不直接执行任意 SQL；
 - 不直接修改权威图谱；
 - 不复制查询逻辑；
-- 只调用共享应用服务并执行权限裁剪。
+- 不暴露完整 ME-Who。
 
-## 不照搬 Codebase-Memory 的部分
+## 不照搬的部分
 
-1. **不向普通 Agent 暴露任意 Cypher**：ME-Who 涉及敏感数据，必须使用类型化查询；
-2. **不让语义抽取直接成为权威事实**：项目决策、偏好和研究结论先进入 Candidate；
-3. **不改成每项目 SQLite 权威库**：继续使用一个 PostgreSQL 权威存储，两个图谱通过 namespace 隔离；
-4. **不一次开放大量工具**：工具增长必须证明能降低 Token 或提升正确率；
-5. **不把 Agent 配置当数据源真相**：动态状态仍来自图谱查询。
+1. 不向普通 Agent 暴露任意 Cypher；
+2. 不让语义推断直接进入权威事实；
+3. 不把一个 JSON 文件作为权威数据库；
+4. 不把 ME-Brain 与 ME-Who 合成无权限边界的平面图；
+5. 不默认把完整 ME-Who 导出或提交 Git；
+6. 不一次开放大量未经 Benchmark 证明的工具；
+7. 不把 Agent 配置文件当动态数据源真相。
 
-## 当前实施影响
+## 后果
 
-下一切片仍建设 Source、Evidence、IngestionRun 和 Candidate 持久化，但这些仅是两个图谱共同的输入设施：
+### 正面
 
-```text
-External Source
-→ shared/ingestion
-→ CandidateGraphChange(target_graph = me_brain | me_who | bridge)
-→ Review
-→ ME-Brain 或 ME-Who
-```
+- 产品边界稳定；
+- 安装、部署和版本只围绕一个包；
+- 两领域共享基础设施但不混淆事实；
+- 后续可以吸收竞品能力而不增加产品线；
+- Source、Candidate 和 MCP 的位置明确。
 
-不会新增：
+### 代价
 
-- ME-Core 产品；
-- ME-Graph-Core 产品；
-- Source Ledger 产品；
-- Candidate 服务产品；
-- 第三张业务图谱；
-- 第二个权威数据库。
-
-## 后续迁移
-
-在新增更多功能前，完成命名和目录迁移：
-
-```text
-services/me-graph-core/  → shared/
-me_graph_core            → me_system
-me-graph                 → me-system
-me-graph-mcp             → me-system-mcp
-```
-
-旧 CLI 可以保留一个小版本兼容别名，但新文档统一使用 ME-System 名称。
+- 需要一次性迁移旧目录、导入名、CLI、CI 和文档；
+- 当前尚未正式发布，选择不保留旧命令兼容别名；
+- 新功能必须明确属于 ME-Brain、ME-Who 或内部实现职责。
 
 ## 结论
 
 ```text
-产品：ME-Brain + ME-Who
-方法：参考 Codebase-Memory 的持久化结构图谱与类型化 MCP
-共享实现：shared/，无第三产品身份
-Agent：通过 MCP 查询两个图谱，不直接扫描全部资料
+产品主体：ME-System
+图谱领域：ME-Brain + ME-Who
+共享职责：Evidence / Ingestion / Review / Persistence / Query / MCP
+Agent：查询两个图谱，必要时下钻证据
 ```

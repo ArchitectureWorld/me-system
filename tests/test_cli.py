@@ -8,14 +8,14 @@ import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-FIXTURE = Path(__file__).resolve().parents[3] / "examples" / "graph" / "lighting-platform.json"
+FIXTURE = PROJECT_ROOT / "examples" / "graph" / "lighting-platform.json"
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(PROJECT_ROOT / "src")
     return subprocess.run(
-        [sys.executable, "-m", "me_core", *args],
+        [sys.executable, "-m", "me_system", *args],
         cwd=PROJECT_ROOT,
         env=env,
         text=True,

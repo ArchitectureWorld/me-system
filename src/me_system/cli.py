@@ -25,7 +25,7 @@ def _add_query_source(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="me-graph")
+    parser = argparse.ArgumentParser(prog="me-system")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     load = subparsers.add_parser("load-fixture", help="validate and summarize a graph fixture")
