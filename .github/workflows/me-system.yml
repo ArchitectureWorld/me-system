@@ -60,6 +60,7 @@ jobs:
           pytest -q --tb=short \
             --ignore=tests/test_mcp_stdio.py \
             --ignore=tests/compat/runtime/test_postgres_integration.py \
+            --ignore=tests/test_ingestion_postgres_e2e.py \
             > pytest-unit.log 2>&1
           status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -102,13 +103,14 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: python -m pip install -q -e '.[dev]'
-      - name: Run PostgreSQL and stdio MCP end-to-end tests
+      - name: Run PostgreSQL graph, ingestion, and stdio MCP end-to-end tests
         id: e2e_tests
         shell: bash
         run: |
           set +e
           pytest -q --tb=short \
             tests/compat/runtime/test_postgres_integration.py \
+            tests/test_ingestion_postgres_e2e.py \
             tests/test_mcp_stdio.py \
             > pytest-e2e.log 2>&1
           status=$?
