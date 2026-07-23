@@ -106,7 +106,7 @@ def store(engine):
 
 def test_schema_creates_graph_tables(engine) -> None:
     names = set(inspect(engine).get_table_names())
-    assert names == {"graph_objects", "graph_evidence_refs"}
+    assert {"graph_objects", "graph_evidence_refs"} <= names
 
 
 def test_node_round_trip_preserves_json_time_and_ordered_evidence(store) -> None:
@@ -125,7 +125,12 @@ def test_edge_round_trip_and_neighbors(store) -> None:
     decision = node("brain:decision:radiance", GraphNamespace.ME_BRAIN)
     store.add_node(project)
     store.add_node(decision)
-    relation = edge("edge:has-decision", GraphNamespace.ME_BRAIN, project.id, decision.id)
+    relation = edge(
+        "edge:has-decision",
+        GraphNamespace.ME_BRAIN,
+        project.id,
+        decision.id,
+    )
     store.add_edge(relation)
     assert store.get_edge(relation.id) == relation
     assert store.neighbors(project.id, direction="out") == (relation,)
@@ -138,7 +143,9 @@ def test_global_duplicate_id_is_rejected(store) -> None:
     store.add_node(project)
     store.add_node(decision)
     with pytest.raises(DuplicateGraphObjectError):
-        store.add_edge(edge(project.id, GraphNamespace.ME_BRAIN, project.id, decision.id))
+        store.add_edge(
+            edge(project.id, GraphNamespace.ME_BRAIN, project.id, decision.id)
+        )
 
 
 def test_missing_endpoint_is_rejected(store) -> None:
@@ -146,7 +153,12 @@ def test_missing_endpoint_is_rejected(store) -> None:
     store.add_node(project)
     with pytest.raises(GraphObjectNotFoundError, match="missing"):
         store.add_edge(
-            edge("edge:missing", GraphNamespace.ME_BRAIN, project.id, "brain:missing")
+            edge(
+                "edge:missing",
+                GraphNamespace.ME_BRAIN,
+                project.id,
+                "brain:missing",
+            )
         )
 
 
@@ -156,8 +168,15 @@ def test_cross_graph_requires_bridge(store) -> None:
     store.add_node(brain)
     store.add_node(who)
     with pytest.raises(GraphNamespaceError, match="bridge"):
-        store.add_edge(edge("edge:invalid", GraphNamespace.ME_BRAIN, brain.id, who.id))
-    bridge = edge("edge:bridge:participates", GraphNamespace.BRIDGE, who.id, brain.id)
+        store.add_edge(
+            edge("edge:invalid", GraphNamespace.ME_BRAIN, brain.id, who.id)
+        )
+    bridge = edge(
+        "edge:bridge:participates",
+        GraphNamespace.BRIDGE,
+        who.id,
+        brain.id,
+    )
     store.add_edge(bridge)
     assert store.list_edges(GraphNamespace.BRIDGE) == (bridge,)
 

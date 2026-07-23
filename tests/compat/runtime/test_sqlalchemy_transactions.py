@@ -12,7 +12,7 @@ from me_core.contracts import (
     TemporalStatus,
 )
 from me_core.errors import GraphObjectNotFoundError, GraphStoreUnavailableError
-from me_core.persistence import store as store_module
+from me_core.persistence import graph_writer as graph_writer_module
 from me_core.persistence.models import EvidenceRefRecord, create_schema
 from me_core.persistence.store import SqlAlchemyGraphStore
 from me_core.persistence.testing import create_sqlite_test_engine
@@ -42,7 +42,7 @@ def test_failed_evidence_write_rolls_back_graph_object(monkeypatch) -> None:
     )
 
     def duplicate_evidence(object_id: str, refs) -> list[EvidenceRefRecord]:
-        evidence = refs[0]
+        evidence = tuple(refs)[0]
         payload = {
             "object_id": object_id,
             "ordinal": 0,
@@ -57,7 +57,11 @@ def test_failed_evidence_write_rolls_back_graph_object(monkeypatch) -> None:
         }
         return [EvidenceRefRecord(**payload), EvidenceRefRecord(**payload)]
 
-    monkeypatch.setattr(store_module, "_evidence_records", duplicate_evidence)
+    monkeypatch.setattr(
+        graph_writer_module,
+        "_evidence_records",
+        duplicate_evidence,
+    )
     with pytest.raises(GraphStoreUnavailableError):
         store.add_node(value)
     with pytest.raises(GraphObjectNotFoundError):
