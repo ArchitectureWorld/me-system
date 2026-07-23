@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from me_graph_core.fixtures import load_graph_fixture
@@ -18,11 +19,16 @@ FIXTURE = (
 PROJECT = "brain:project:lighting-platform"
 
 
-def tools(
-    allowed: frozenset[str] | None = frozenset({PROJECT}),
-) -> HermesReadOnlyTools:
+def graph_store() -> InMemoryGraphStore:
     store = InMemoryGraphStore()
     load_graph_fixture(FIXTURE, store)
+    return store
+
+
+def tools_for_store(
+    store: InMemoryGraphStore,
+    allowed: frozenset[str] | None = frozenset({PROJECT}),
+) -> HermesReadOnlyTools:
     return HermesReadOnlyTools(
         resolver=ProjectResolver(store, allowed_project_ids=allowed),
         query=GraphQueryService(store),
@@ -34,6 +40,12 @@ def tools(
         hermes_user_id="who:user:master",
         max_subgraph_depth=2,
     )
+
+
+def tools(
+    allowed: frozenset[str] | None = frozenset({PROJECT}),
+) -> HermesReadOnlyTools:
+    return tools_for_store(graph_store(), allowed)
 
 
 def assert_ok(value: dict[str, object]) -> object:
@@ -86,6 +98,57 @@ def test_trace_decision_and_evidence() -> None:
         )
     )
     assert refs[0]["source_id"] == "src:conversation:2026-07-14"
+
+
+def test_trace_decision_filters_cross_project_history() -> None:
+    store = graph_store()
+    current_project = store.get_node(PROJECT)
+    current_decision = store.get_node("brain:decision:radiance-primary")
+    ownership = store.get_edge("edge:project-has-radiance")
+    history = store.get_edge("edge:radiance-supersedes-cycles")
+
+    other_project = replace(
+        current_project,
+        id="brain:project:other",
+        label="other",
+        properties={"aliases": ["other"]},
+    )
+    other_decision = replace(
+        current_decision,
+        id="brain:decision:other",
+        label="Other project decision",
+    )
+    store.add_node(other_project)
+    store.add_node(other_decision)
+    store.add_edge(
+        replace(
+            ownership,
+            id="edge:other-has-decision",
+            from_id=other_project.id,
+            to_id=other_decision.id,
+        )
+    )
+    store.add_edge(
+        replace(
+            history,
+            id="edge:cross-project-history",
+            from_id=current_decision.id,
+            to_id=other_decision.id,
+        )
+    )
+
+    trace = assert_ok(
+        tools_for_store(store).trace_decision(
+            PROJECT,
+            current_decision.id,
+        )
+    )
+    assert other_decision.id not in {
+        node["id"] for node in trace["nodes"]
+    }
+    assert "edge:cross-project-history" not in {
+        edge["id"] for edge in trace["edges"]
+    }
 
 
 def test_task_profile_uses_fixed_user() -> None:
