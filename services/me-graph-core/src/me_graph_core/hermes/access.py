@@ -54,13 +54,34 @@ class ProjectScopeGuard:
                 f"{self._membership_depth}"
             )
 
-    def project_member_ids(self, project_id: str) -> frozenset[str]:
-        """Return objects explicitly owned by a project plus decision history.
+    def _decision_owned_by_other_project(
+        self,
+        project_id: str,
+        decision_id: str,
+    ) -> bool:
+        owners: set[str] = set()
+        for edge in self.store.neighbors(
+            decision_id,
+            edge_types={"HAS_DECISION"},
+            direction="in",
+        ):
+            try:
+                owner = self.store.get_node(edge.from_id)
+            except GraphObjectNotFoundError:
+                continue
+            if (
+                owner.graph is GraphNamespace.ME_BRAIN
+                and owner.type == "Project"
+            ):
+                owners.add(owner.id)
+        return bool(owners and project_id not in owners)
 
-        Arbitrary semantic relations must not expand the authorization boundary.
-        A node first enters the project scope through an outgoing project
-        ``HAS_*`` ownership relation. Historical decisions may then be reached
-        through a bounded ``SUPERSEDES`` chain.
+    def project_member_ids(self, project_id: str) -> frozenset[str]:
+        """Return explicitly owned objects plus bounded decision history.
+
+        Arbitrary semantic relations never expand the authorization boundary.
+        Historical decisions inherit scope only when another project does not
+        explicitly own them.
         """
 
         self.require_project(project_id)
@@ -102,6 +123,10 @@ class ProjectScopeGuard:
                     node.graph is not GraphNamespace.ME_BRAIN
                     or node.type != "Decision"
                     or node.id in members
+                    or self._decision_owned_by_other_project(
+                        project_id,
+                        node.id,
+                    )
                 ):
                     continue
                 members.add(node.id)
