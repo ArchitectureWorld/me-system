@@ -33,7 +33,7 @@ def _parser() -> argparse.ArgumentParser:
             / "lighting-platform.json"
         ).resolve(),
     )
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-mcp", action="store_true")
     parser.add_argument("--allow-test-database", action="store_true")
