@@ -124,6 +124,7 @@ me-system/
 
 ## 文档导航
 
+- [当前架构状态](docs/architecture-status.md)
 - [当前产品与架构总纲](docs/00-product-and-architecture-overview.md)
 - [ADR-0004：双权威图谱作为系统核心](docs/adr/ADR-0004-two-canonical-graphs.md)
 - [双图谱契约 v0.1](docs/specs/dual-graph-contract-v0.1.md)
