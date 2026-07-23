@@ -139,50 +139,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and start novice experience stack
-        run: docker compose -f deploy/experience/compose.yml up --build -d
-      - name: Wait for dashboard and verify all eight checks
+      - name: Run the actual Linux one-click launcher
+        run: ./体验.sh
+      - name: Verify initial and rerun browser acceptance reports
         shell: bash
         run: |
           set -euo pipefail
-          ready=0
-          for _ in $(seq 1 90); do
-            if curl -fsS http://localhost:8765/healthz > health.json; then
-              ready=1
-              break
-            fi
-            sleep 2
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "Experience dashboard did not become healthy."
-            exit 1
-          fi
-          curl -fsS http://localhost:8765/api/report > experience-report.json
+          curl -fsS http://localhost:8765/healthz > health.json
+          curl -fsS http://localhost:8765/api/report > experience-report-first.json
+          curl -fsS -X POST http://localhost:8765/api/run > experience-report-rerun.json
           python - <<'PY'
           import json
           from pathlib import Path
 
-          payload = json.loads(Path("experience-report.json").read_text())
-          assert payload["status"] == "pass", payload
-          assert len(payload["checks"]) == 8, payload
-          assert all(item["status"] == "pass" for item in payload["checks"]), payload
-          assert payload["passed_count"] == 8, payload
-          assert payload["failed_count"] == 0, payload
-          assert len(payload["technical"]["tool_names"]) == 6, payload
+          first = json.loads(Path("experience-report-first.json").read_text())
+          rerun = json.loads(Path("experience-report-rerun.json").read_text())
+
+          for payload in (first, rerun):
+              assert payload["status"] == "pass", payload
+              assert len(payload["checks"]) == 8, payload
+              assert all(item["status"] == "pass" for item in payload["checks"]), payload
+              assert payload["passed_count"] == 8, payload
+              assert payload["failed_count"] == 0, payload
+              assert payload["skipped_count"] == 0, payload
+              assert len(payload["technical"]["tool_names"]) == 6, payload
+
+          assert first["run_id"] != rerun["run_id"], (first, rerun)
+          assert first["technical"]["source_id"] != rerun["technical"]["source_id"]
+          assert first["technical"]["brain_task_id"] != rerun["technical"]["brain_task_id"]
+          assert first["technical"]["who_rule_id"] != rerun["technical"]["who_rule_id"]
           print(json.dumps({
-              "run_id": payload["run_id"],
-              "status": payload["status"],
-              "passed_count": payload["passed_count"],
+              "first_run_id": first["run_id"],
+              "rerun_id": rerun["run_id"],
+              "status": "pass",
+              "passed_count_each": 8,
           }, ensure_ascii=False))
           PY
-      - name: Upload browser acceptance report
+      - name: Upload browser acceptance reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: one-click-experience-report
           path: |
             health.json
-            experience-report.json
+            experience-report-first.json
+            experience-report-rerun.json
           if-no-files-found: warn
       - name: Show experience logs on failure
         if: failure()
