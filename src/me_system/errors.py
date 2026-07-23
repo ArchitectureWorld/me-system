@@ -1,9 +1,9 @@
 class GraphCoreError(Exception):
-    """Base error for ME-System graph core."""
+    """Base error for ME-System."""
 
 
 class ContractValidationError(GraphCoreError, ValueError):
-    """Raised when a graph contract is invalid."""
+    """Raised when a ME-System contract is invalid."""
 
 
 class DuplicateGraphObjectError(GraphCoreError):
@@ -19,7 +19,7 @@ class GraphNamespaceError(GraphCoreError, ValueError):
 
 
 class CandidateReviewError(GraphCoreError, ValueError):
-    """Raised when a candidate change cannot be reviewed or applied."""
+    """Raised when an in-memory candidate change cannot be reviewed or applied."""
 
 
 class GraphStoreConfigurationError(GraphCoreError, ValueError):
@@ -40,3 +40,35 @@ class HermesConfigurationError(GraphCoreError, ValueError):
 
 class ProjectAccessError(GraphCoreError, PermissionError):
     """Raised when an object is outside the configured Hermes project scope."""
+
+
+class SourceConflictError(GraphCoreError):
+    """Raised when an idempotent source retry contains different immutable content."""
+
+
+class SourceNotFoundError(GraphCoreError, KeyError):
+    """Raised when a source record does not exist."""
+
+
+class EvidenceConflictError(GraphCoreError):
+    """Raised when an evidence fragment conflicts with an existing identity or ordinal."""
+
+
+class IngestionStateError(GraphCoreError, ValueError):
+    """Raised when an ingestion run cannot make the requested state transition."""
+
+
+class CandidateConflictError(GraphCoreError):
+    """Raised when an idempotent candidate retry contains a different payload."""
+
+
+class CandidateNotFoundError(GraphCoreError, KeyError):
+    """Raised when a persistent candidate does not exist."""
+
+
+class CandidateStateError(GraphCoreError, ValueError):
+    """Raised when a persistent candidate is no longer in the required state."""
+
+
+class ReviewTransactionError(GraphCoreError):
+    """Raised when candidate review and canonical graph persistence cannot commit atomically."""
