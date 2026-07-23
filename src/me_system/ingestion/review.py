@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
 from sqlalchemy import Engine, select
@@ -45,10 +45,10 @@ def _merge_evidence(*groups: tuple[EvidenceRef, ...]) -> tuple[EvidenceRef, ...]
 
 
 def _review_time(created_at: datetime) -> datetime:
-    """Return a valid review time even when producer and server clocks drift."""
+    """Return a review time strictly after submission despite clock skew."""
 
-    now = datetime.now(timezone.utc)
-    return max(now, created_at.astimezone(timezone.utc))
+    created = created_at.astimezone(timezone.utc)
+    return max(datetime.now(timezone.utc), created + timedelta(microseconds=1))
 
 
 class PersistentReviewService:
