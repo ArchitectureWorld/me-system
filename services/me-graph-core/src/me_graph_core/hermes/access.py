@@ -6,6 +6,15 @@ from ..contracts import GraphEdge, GraphNamespace, GraphNode
 from ..errors import GraphObjectNotFoundError, ProjectAccessError
 from ..store import GraphStore
 
+_PROJECT_OWNERSHIP_EDGE_TYPES = {
+    "HAS_DECISION",
+    "HAS_REQUIREMENT",
+    "HAS_TASK",
+    "HAS_ISSUE",
+    "HAS_ARTIFACT",
+    "HAS_CONSTRAINT",
+}
+
 
 class ProjectScopeGuard:
     """Enforce server-side project scope for read-only Hermes tools."""
@@ -46,29 +55,59 @@ class ProjectScopeGuard:
             )
 
     def project_member_ids(self, project_id: str) -> frozenset[str]:
+        """Return objects explicitly owned by a project plus decision history.
+
+        Arbitrary semantic relations must not expand the authorization boundary.
+        A node first enters the project scope through an outgoing project
+        ``HAS_*`` ownership relation. Historical decisions may then be reached
+        through a bounded ``SUPERSEDES`` chain.
+        """
+
         self.require_project(project_id)
-        visited = {project_id}
-        queue: deque[tuple[str, int]] = deque([(project_id, 0)])
-        while queue:
-            current, depth = queue.popleft()
+        members = {project_id}
+        decisions: deque[tuple[str, int]] = deque()
+
+        for edge in self.store.neighbors(
+            project_id,
+            edge_types=_PROJECT_OWNERSHIP_EDGE_TYPES,
+            direction="out",
+        ):
+            try:
+                node = self.store.get_node(edge.to_id)
+            except GraphObjectNotFoundError:
+                continue
+            if node.graph is not GraphNamespace.ME_BRAIN or node.type == "Project":
+                continue
+            members.add(node.id)
+            if node.type == "Decision":
+                decisions.append((node.id, 1))
+
+        while decisions:
+            current_id, depth = decisions.popleft()
             if depth >= self._membership_depth:
                 continue
-            for edge in self.store.neighbors(current, direction="both"):
-                if edge.graph is not GraphNamespace.ME_BRAIN:
-                    continue
-                other = edge.to_id if edge.from_id == current else edge.from_id
+            for edge in self.store.neighbors(
+                current_id,
+                edge_types={"SUPERSEDES"},
+                direction="both",
+            ):
+                other_id = (
+                    edge.to_id if edge.from_id == current_id else edge.from_id
+                )
                 try:
-                    node = self.store.get_node(other)
+                    node = self.store.get_node(other_id)
                 except GraphObjectNotFoundError:
                     continue
-                if node.graph is not GraphNamespace.ME_BRAIN:
+                if (
+                    node.graph is not GraphNamespace.ME_BRAIN
+                    or node.type != "Decision"
+                    or node.id in members
+                ):
                     continue
-                if node.type == "Project" and node.id != project_id:
-                    continue
-                if node.id not in visited:
-                    visited.add(node.id)
-                    queue.append((node.id, depth + 1))
-        return frozenset(visited)
+                members.add(node.id)
+                decisions.append((node.id, depth + 1))
+
+        return frozenset(members)
 
     def require_member(
         self, project_id: str, object_id: str
