@@ -8,12 +8,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
-from ..contracts import (
-    EvidenceRef,
-    GraphEdge,
-    GraphNode,
-    ReviewStatus,
-)
+from ..contracts import EvidenceRef, GraphEdge, GraphNode, ReviewStatus
 from ..errors import (
     CandidateNotFoundError,
     CandidateStateError,
@@ -49,6 +44,13 @@ def _merge_evidence(*groups: tuple[EvidenceRef, ...]) -> tuple[EvidenceRef, ...]
     return tuple(unique[key] for key in sorted(unique))
 
 
+def _review_time(created_at: datetime) -> datetime:
+    """Return a valid review time even when producer and server clocks drift."""
+
+    now = datetime.now(timezone.utc)
+    return max(now, created_at.astimezone(timezone.utc))
+
+
 class PersistentReviewService:
     """Atomically review a persistent candidate and update the canonical graph."""
 
@@ -70,7 +72,6 @@ class PersistentReviewService:
             raise CandidateStateError(
                 "reviewer_kind must be human or rule for canonical approval"
             )
-        reviewed_at = datetime.now(timezone.utc)
         try:
             with self._sessions.begin() as session:
                 row = session.scalar(
@@ -83,6 +84,7 @@ class PersistentReviewService:
                 candidate = _to_candidate(session, row)
                 if candidate.change.review_status is not ReviewStatus.PENDING:
                     raise CandidateStateError("candidate is no longer pending")
+                reviewed_at = _review_time(candidate.created_at)
                 materialized = candidate.change.materialize()
                 merged_refs = _merge_evidence(
                     materialized.source_refs,
@@ -150,7 +152,6 @@ class PersistentReviewService:
             raise CandidateStateError(
                 "reviewer_kind must be adapter, agent, human, or rule"
             ) from exc
-        reviewed_at = datetime.now(timezone.utc)
         try:
             with self._sessions.begin() as session:
                 row = session.scalar(
@@ -163,6 +164,7 @@ class PersistentReviewService:
                 candidate = _to_candidate(session, row)
                 if candidate.change.review_status is not ReviewStatus.PENDING:
                     raise CandidateStateError("candidate is no longer pending")
+                reviewed_at = _review_time(candidate.created_at)
                 row.review_status = ReviewStatus.REJECTED.value
                 row.reviewed_at = reviewed_at
                 row.reviewed_by = reviewer_id
