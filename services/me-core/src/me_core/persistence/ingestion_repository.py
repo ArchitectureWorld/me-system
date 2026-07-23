@@ -3,18 +3,26 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 
-from sqlalchemy import Engine, or_, select
+from sqlalchemy import Engine, case, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..errors import (
     EvidenceConflictError,
     GraphStoreUnavailableError,
+    IngestionRunError,
+    IngestionRunNotFoundError,
     SourceConflictError,
     SourceNotFoundError,
 )
-from ..ingestion.contracts import EvidenceFragment, SourceRecord
-from .models import EvidenceFragmentRow, SourceRecordRow
+from ..ingestion.contracts import (
+    EvidenceFragment,
+    IngestionCounts,
+    IngestionRun,
+    IngestionStatus,
+    SourceRecord,
+)
+from .models import EvidenceFragmentRow, IngestionRunRow, SourceRecordRow
 
 
 def _aware(value: datetime | None) -> datetime | None:
@@ -104,6 +112,74 @@ def _serialized_fragment(fragment: EvidenceFragment) -> str:
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
+    )
+
+
+def _run_row(run: IngestionRun) -> IngestionRunRow:
+    return IngestionRunRow(
+        run_id=run.run_id,
+        source_id=run.source_id,
+        adapter_name=run.adapter_name,
+        adapter_version=run.adapter_version,
+        pipeline_version=run.pipeline_version,
+        status=run.status.value,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        input_item_count=run.counts.input_item_count,
+        processed_item_count=run.counts.processed_item_count,
+        skipped_item_count=run.counts.skipped_item_count,
+        failed_item_count=run.counts.failed_item_count,
+        fragment_count=run.counts.fragment_count,
+        candidate_count=run.counts.candidate_count,
+        coverage_ratio=run.coverage_ratio,
+        quality_report=dict(run.quality_report),
+        log_ref=run.log_ref,
+        error_summary=run.error_summary,
+    )
+
+
+def _apply_run(row: IngestionRunRow, run: IngestionRun) -> None:
+    row.source_id = run.source_id
+    row.adapter_name = run.adapter_name
+    row.adapter_version = run.adapter_version
+    row.pipeline_version = run.pipeline_version
+    row.status = run.status.value
+    row.started_at = run.started_at
+    row.completed_at = run.completed_at
+    row.input_item_count = run.counts.input_item_count
+    row.processed_item_count = run.counts.processed_item_count
+    row.skipped_item_count = run.counts.skipped_item_count
+    row.failed_item_count = run.counts.failed_item_count
+    row.fragment_count = run.counts.fragment_count
+    row.candidate_count = run.counts.candidate_count
+    row.coverage_ratio = run.coverage_ratio
+    row.quality_report = dict(run.quality_report)
+    row.log_ref = run.log_ref
+    row.error_summary = run.error_summary
+
+
+def _to_run(row: IngestionRunRow) -> IngestionRun:
+    return IngestionRun(
+        run_id=row.run_id,
+        source_id=row.source_id,
+        adapter_name=row.adapter_name,
+        adapter_version=row.adapter_version,
+        pipeline_version=row.pipeline_version,
+        status=IngestionStatus(row.status),
+        started_at=_aware(row.started_at),
+        completed_at=_aware(row.completed_at),
+        counts=IngestionCounts(
+            input_item_count=row.input_item_count,
+            processed_item_count=row.processed_item_count,
+            skipped_item_count=row.skipped_item_count,
+            failed_item_count=row.failed_item_count,
+            fragment_count=row.fragment_count,
+            candidate_count=row.candidate_count,
+        ),
+        coverage_ratio=row.coverage_ratio,
+        quality_report=dict(row.quality_report),
+        log_ref=row.log_ref,
+        error_summary=row.error_summary,
     )
 
 
@@ -233,6 +309,98 @@ class SqlAlchemyIngestionRepository:
             raise
         except SQLAlchemyError as exc:
             raise GraphStoreUnavailableError("unable to list evidence fragments") from exc
+
+    def create_run(self, run: IngestionRun) -> IngestionRun:
+        try:
+            with self._sessions.begin() as session:
+                self._require_source_row(session, run.source_id)
+                if session.get(IngestionRunRow, run.run_id) is not None:
+                    raise IngestionRunError(f"run_id already exists: {run.run_id}")
+                session.add(_run_row(run))
+                session.flush()
+                return run
+        except (SourceNotFoundError, IngestionRunError):
+            raise
+        except IntegrityError as exc:
+            raise IngestionRunError(
+                f"run_id conflicts with an existing ingestion run: {run.run_id}"
+            ) from exc
+        except SQLAlchemyError as exc:
+            raise GraphStoreUnavailableError("unable to persist ingestion run") from exc
+
+    def get_run(self, run_id: str) -> IngestionRun:
+        try:
+            with self._sessions() as session:
+                row = session.get(IngestionRunRow, run_id)
+                if row is None:
+                    raise IngestionRunNotFoundError(f"ingestion run not found: {run_id}")
+                return _to_run(row)
+        except IngestionRunNotFoundError:
+            raise
+        except SQLAlchemyError as exc:
+            raise GraphStoreUnavailableError("unable to read ingestion run") from exc
+
+    def transition_run(
+        self,
+        run: IngestionRun,
+        *,
+        expected_status: IngestionStatus,
+    ) -> IngestionRun:
+        try:
+            with self._sessions.begin() as session:
+                row = session.scalar(
+                    select(IngestionRunRow)
+                    .where(IngestionRunRow.run_id == run.run_id)
+                    .with_for_update()
+                )
+                if row is None:
+                    raise IngestionRunNotFoundError(
+                        f"ingestion run not found: {run.run_id}"
+                    )
+                if row.status != expected_status.value:
+                    raise IngestionRunError(
+                        f"ingestion run must be {expected_status.value} before this transition"
+                    )
+                _apply_run(row, run)
+                session.flush()
+                return run
+        except (IngestionRunNotFoundError, IngestionRunError):
+            raise
+        except IntegrityError as exc:
+            raise IngestionRunError("ingestion run transition violates database constraints") from exc
+        except SQLAlchemyError as exc:
+            raise GraphStoreUnavailableError("unable to update ingestion run") from exc
+
+    def list_runs(
+        self,
+        source_id: str,
+        *,
+        limit: int = 100,
+    ) -> tuple[IngestionRun, ...]:
+        if not 1 <= limit <= 1000:
+            raise IngestionRunError("limit must be between 1 and 1000")
+        try:
+            with self._sessions() as session:
+                self._require_source_row(session, source_id)
+                pending_last = case(
+                    (IngestionRunRow.started_at.is_(None), 1),
+                    else_=0,
+                )
+                rows = session.scalars(
+                    select(IngestionRunRow)
+                    .where(IngestionRunRow.source_id == source_id)
+                    .order_by(
+                        pending_last,
+                        IngestionRunRow.started_at.desc(),
+                        IngestionRunRow.run_id.desc(),
+                    )
+                    .limit(limit)
+                ).all()
+                return tuple(_to_run(row) for row in rows)
+        except (SourceNotFoundError, IngestionRunError):
+            raise
+        except SQLAlchemyError as exc:
+            raise GraphStoreUnavailableError("unable to list ingestion runs") from exc
 
     @staticmethod
     def _require_source_row(session: Session, source_id: str) -> SourceRecordRow:
