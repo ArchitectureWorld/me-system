@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from me_graph_core.contracts import (
+from me_core.contracts import (
     AuthorityLevel,
     ConfirmationStatus,
     EvidenceRef,
@@ -11,11 +11,11 @@ from me_graph_core.contracts import (
     Sensitivity,
     TemporalStatus,
 )
-from me_graph_core.errors import GraphObjectNotFoundError, GraphStoreUnavailableError
-from me_graph_core.persistence import store as store_module
-from me_graph_core.persistence.models import EvidenceRefRecord, create_schema
-from me_graph_core.persistence.store import SqlAlchemyGraphStore
-from me_graph_core.persistence.testing import create_sqlite_test_engine
+from me_core.errors import GraphObjectNotFoundError, GraphStoreUnavailableError
+from me_core.persistence import store as store_module
+from me_core.persistence.models import EvidenceRefRecord, create_schema
+from me_core.persistence.store import SqlAlchemyGraphStore
+from me_core.persistence.testing import create_sqlite_test_engine
 
 
 def test_failed_evidence_write_rolls_back_graph_object(monkeypatch) -> None:

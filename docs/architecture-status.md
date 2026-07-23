@@ -2,114 +2,180 @@
 
 > 更新日期：2026-07-23
 
-本文件用于区分当前有效规范、已实现能力、历史研究材料和后续实现方向。
+本文件区分当前有效决策、已实现能力、实施边界和下一阶段工作。
+
+## 当前唯一架构层级
+
+```text
+ME-System                 产品与仓库
+└── ME-Core               唯一运行与语义内核
+    ├── ME-Brain Graph    项目事实图谱域
+    ├── ME-Who Graph      用户理解图谱域
+    ├── Bridge            显式跨图关系
+    ├── Source/Evidence   输入与证据
+    ├── Candidate/Review  权威写入缓冲与治理
+    ├── Query/Projection  GraphSlice
+    └── MCP/CLI           薄访问前端
+```
+
+不存在独立的 ME-Context Core、ME-Graph Core、Source Ledger Core 或 MCP Core。
 
 ## 当前有效的最高层决策
 
-1. `docs/adr/ADR-0004-two-canonical-graphs.md`
-   - ME-Brain Graph 与 ME-Who Graph 是两个产品核心。
-   - 文档标准化属于输入与证据层。
-   - MCP、REST、SDK 属于 Agent 访问层。
-   - Context Pack 是 GraphSlice 的运行时投影。
+### ADR-0004：双权威图谱
 
-2. `docs/adr/ADR-0003-agent-context-access-layer.md`
-   - 规定 Agent 不直连数据库，以及 Hermes/Pi 的访问边界。
-   - 受 ADR-0004 约束，不得反向定义图谱模型。
+- ME-Brain Graph 与 ME-Who Graph 是两个权威业务图谱域；
+- 文档标准化属于输入与证据层；
+- Context Pack 是 GraphSlice 的运行时投影；
+- Agent 不能直接修改权威图谱。
 
-## 当前有效的实现契约
+### ADR-0005：单一 ME-Core
+
+- `services/me-core/` 是唯一运行内核；
+- 两个图谱域共用同一 PostgreSQL、事务、证据、查询和权限语义；
+- Source、Candidate、MCP、CLI、Adapter 都是 ME-Core 的内部模块或薄前端；
+- Domain Pack 不得创建第二套 Store；
+- 只有可量化的性能、安全或团队边界才能触发拆分评审。
+
+### ADR-0003：Agent 访问边界
+
+- Agent 不直接连接 PostgreSQL；
+- Agent 不生成任意 Cypher；
+- Hermes/Pi 通过受限 MCP/SDK 工具访问；
+- Adapter 不得反向定义图谱 Schema。
+
+## 当前有效契约与设计
 
 - `docs/specs/dual-graph-contract-v0.1.md`
 - `docs/specs/me-brain-ontology-v0.1.md`
 - `docs/specs/me-who-ontology-v0.1.md`
-- `services/me-graph-core/schemas/`
+- `services/me-core/schemas/`
 - `docs/superpowers/specs/2026-07-23-postgresql-graph-store-design.md`
 - `docs/superpowers/specs/2026-07-23-hermes-readonly-mcp-design.md`
+- `docs/superpowers/specs/2026-07-23-source-ledger-candidate-persistence-design.md`
+- `docs/competitors/codebase-memory-architecture-review.md`
 
 ## 当前可运行基线
 
-### 图谱契约与查询
+### ME-Core 图谱与查询
 
-- `services/me-graph-core/`
-- `examples/graph/lighting-platform.json`
 - ME-Brain、ME-Who、Bridge 命名空间；
+- `GraphNode`、`GraphEdge`、`EvidenceRef`、`CandidateGraphChange`、`GraphSlice`；
 - 当前项目快照、决策链、子图、证据和任务画像查询；
-- Candidate 提交、批准和驳回。
+- 进程内 Candidate 提交、批准和驳回；
+- `examples/graph/lighting-platform.json`。
 
-### 持久化
+### PostgreSQL 权威存储
 
-- `InMemoryGraphStore`：测试与轻量运行；
+- `InMemoryGraphStore`：测试和轻量验收；
 - `SqlAlchemyGraphStore`：PostgreSQL 权威持久化；
-- `graph_objects`：全局唯一的节点与边；
+- `graph_objects`：全局唯一节点和边；
 - `graph_evidence_refs`：有序证据引用；
-- Alembic 初始迁移和迁移幂等性；
+- Alembic 初始迁移；
 - `db-upgrade`、`import-fixture` 和数据库查询 CLI；
 - `deploy/postgres/`：PostgreSQL 16 Compose 示例。
 
-### Hermes 只读访问
+### Hermes 只读 MCP
 
-- canonical ID、label、alias、workspace path 和 external ID 的确定性 Project Resolver；
-- `ME_GRAPH_ALLOWED_PROJECT_IDS` 服务端 allowlist；
-- `ME_GRAPH_HERMES_USER_ID` 固定 ME-Who 用户；
-- 显式项目所有权和历史决策继承范围；
+- canonical ID、label、alias、workspace path 和 external ID 的确定性 Resolver；
+- 服务端 Project allowlist；
+- 服务端固定 ME-Who 用户；
+- 显式项目所有权和历史决策范围；
 - 跨项目语义边不扩大授权；
 - 六个只读 stdio MCP 工具；
 - `integrations/hermes/` 配置、Bootstrap 和部署说明。
 
-当前实现已在 GitHub Actions 中通过：
+### 当前命名
+
+```text
+服务目录        services/me-core/
+Python 包       me_core
+Python 分发     me-core
+主 CLI          me-system
+主 MCP 命令     me-system-mcp
+```
+
+旧命令 `me-graph` 与 `me-graph-mcp` 只作为一个小版本的兼容别名。
+
+## 已验证环境
 
 ```text
 Python 3.11 单元与契约测试
 Python 3.12 单元与契约测试
 PostgreSQL 16 迁移和图谱查询
 真实 stdio MCP ClientSession E2E
+Python compileall
 ```
 
 ## 当前实现边界
 
-以下内容尚未完成：
+尚未完成：
 
-- 使用真实 Hermes UI/Agent 的项目恢复 Benchmark；
-- 文档、对话和 Git 的 CandidateGraphChange Adapter；
-- 未批准 Candidate 与审核日志的跨重启持久化；
-- 图谱字段级 Agent 权限过滤；
+- SourceRecord 与 EvidenceFragment 持久化；
+- IngestionRun、覆盖率和质量状态；
+- pending Candidate 与 ReviewEvent 跨重启持久化；
+- Candidate 批准与权威写入的单事务闭环；
+- Agent Conversation、Markdown、Git 和 Zotero Pass；
+- 图谱字段级 Agent 权限；
 - 原始证据正文读取和内容脱敏；
+- 真实 Hermes 项目恢复 Benchmark；
 - Streamable HTTP / OAuth MCP；
 - 图谱治理界面；
 - Pi Extension；
-- 生产规模下的批量证据读取优化。
+- 生产规模批量证据读取优化。
 
-## 输入与证据层材料
+## 输入与证据原则
 
-`docs/specs/document-information-standardization-v0.1.md` 保留为广义输入格式研究材料，但它不是当前 P0 的完整实现清单。P0 仅优先实现：
+P0 输入模型收敛为：
 
-- SourceRecord
-- Document
-- DocumentVersion
-- ContentFragment
-- EvidenceAnchor
-- ParserRun / QualityIssue
+```text
+SourceRecord
+EvidenceFragment
+IngestionRun
+CandidateGraphChangeRecord
+CandidateReviewEvent
+```
 
-其余复杂格式、资产重建和全格式解析在真实需求出现后逐项扩展。
+复杂 Document、Page、Figure、Equation 和版面对象只在真实领域需求出现后扩展，不作为所有输入的前置条件。
 
-## 已废止的方向
+Adapter 采用多阶段 Pass：
 
-以下内容不再作为有效架构：
+```text
+Discover
+→ Normalize
+→ Fragment
+→ Extract Candidate
+→ Resolve Identity
+→ Detect Conflict
+→ Review
+→ Commit Canonical Graph
+→ Build Derived Index
+```
 
-- ME-Context 作为第三个产品；
-- ME-Reader 作为第三条产品线；
+每个 Pass 记录版本、覆盖率、跳过和失败范围，但不拥有独立数据库。
+
+## 已废止方向
+
+- ME-Context 作为第三产品；
+- ME-Reader 作为第三产品线；
+- ME-Graph Core 作为额外核心；
+- Source Ledger 作为独立服务或数据库；
 - 独立 Agent Context Gateway 作为系统核心；
-- 在权威图谱之前优先建设完整 Handoff、复杂 Token 编译和多 Agent 编排协议；
-- Agent 直接查询数据库或生成任意 Cypher；
-- 同时维护多个权威数据库实现；
-- 用 LLM 或模糊匹配擅自猜测项目范围。
-
-历史研究内容可通过 Git 历史和已关闭 PR 查看，不继续保留为主分支活动规格。
+- 在权威图谱之前建设完整 Handoff 和多 Agent 编排；
+- Agent 直接查询数据库或任意 Cypher；
+- 多个权威数据库并行；
+- LLM 或模糊匹配擅自猜测项目范围；
+- Adapter 自动把语义推断写入权威图谱。
 
 ## 下一实施切片
 
 ```text
-真实 Hermes 项目恢复 Benchmark
-→ Agent Conversation Adapter
-→ Candidate 持久化与审核
-→ Markdown / Git Adapter
+Source / Evidence / Ingestion Status
+→ Persistent Candidate Buffer
+→ Atomic Candidate Review
+→ Agent Conversation Pass
+→ Markdown / Git Pass
+→ 真实 Hermes Benchmark
 ```
+
+这些能力全部在 `services/me-core/` 内实现，不新增平级核心。

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from me_graph_core.contracts import (
+from me_core.contracts import (
     AuthorityLevel,
     CandidateGraphChange,
     ChangeOperation,
@@ -14,9 +14,9 @@ from me_graph_core.contracts import (
     Sensitivity,
     TemporalStatus,
 )
-from me_graph_core.errors import CandidateReviewError, GraphObjectNotFoundError
-from me_graph_core.review import CandidateReviewService
-from me_graph_core.store import InMemoryGraphStore
+from me_core.errors import CandidateReviewError, GraphObjectNotFoundError
+from me_core.review import CandidateReviewService
+from me_core.store import InMemoryGraphStore
 
 
 def evidence(source_id: str) -> EvidenceRef:

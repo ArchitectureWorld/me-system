@@ -5,7 +5,7 @@ Hermes 通过 stdio MCP 读取 ME-System。MCP Adapter 只包装 `GraphQueryServ
 ## 前置条件
 
 1. PostgreSQL GraphStore 已迁移并包含项目图谱；
-2. `me-graph-core` 已安装；
+2. `me-core` 已安装；
 3. 已为 Hermes 准备专用只读数据库账号；
 4. Hermes MCP 配置中显式提供：
 
@@ -100,7 +100,7 @@ chmod 600 ~/.hermes/config.yaml
 ME_GRAPH_DATABASE_URL='postgresql+psycopg://me_graph_reader:密码@127.0.0.1:5432/me_graph' \
 ME_GRAPH_HERMES_USER_ID='who:user:master' \
 ME_GRAPH_ALLOWED_PROJECT_IDS='brain:project:lighting-platform' \
-me-graph-mcp
+me-system-mcp
 ```
 
 这是 stdio Server，直接启动后等待 MCP Client，不会显示普通交互式命令行。

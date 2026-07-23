@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from me_graph_core.contracts import (
+from me_core.contracts import (
     AuthorityLevel,
     CandidateGraphChange,
     ChangeOperation,
@@ -18,7 +18,7 @@ from me_graph_core.contracts import (
     Sensitivity,
     TemporalStatus,
 )
-from me_graph_core.errors import ContractValidationError
+from me_core.errors import ContractValidationError
 
 
 def evidence(source_id: str = "src_1") -> EvidenceRef:

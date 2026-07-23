@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from me_graph_core.errors import GraphStoreConfigurationError
-from me_graph_core.persistence.database import create_database_engine, redact_database_url
+from me_core.errors import GraphStoreConfigurationError
+from me_core.persistence.database import create_database_engine, redact_database_url
 
 
 def test_production_engine_requires_postgresql_psycopg() -> None:

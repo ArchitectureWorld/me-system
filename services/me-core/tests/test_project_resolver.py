@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from me_graph_core.fixtures import load_graph_fixture
-from me_graph_core.hermes.resolver import ProjectResolver
-from me_graph_core.store import InMemoryGraphStore
+from me_core.fixtures import load_graph_fixture
+from me_core.hermes.resolver import ProjectResolver
+from me_core.store import InMemoryGraphStore
 
 FIXTURE = (
     Path(__file__).resolve().parents[3]
