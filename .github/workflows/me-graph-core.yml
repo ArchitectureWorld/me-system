@@ -59,14 +59,7 @@ jobs:
           --ignore=tests/test_postgres_integration.py
 
       - name: Verify FastMCP tool registration
-        run: >-
-          pytest -q --tb=short
-          tests/test_mcp_server.py::test_mcp_exposes_exactly_six_read_only_tools
-
-      - name: Verify FastMCP in-process tool call
-        run: >-
-          pytest -q --tb=short
-          tests/test_mcp_server.py::test_mcp_tool_returns_structured_envelope
+        run: pytest -q --tb=short tests/test_mcp_server.py
 
       - name: Compile Python sources
         run: python -m compileall -q src
