@@ -26,6 +26,15 @@ from me_core.persistence.store import SqlAlchemyGraphStore
 from me_core.persistence.testing import create_sqlite_test_engine
 
 
+EXPECTED_TABLES = {
+    "graph_objects",
+    "graph_evidence_refs",
+    "source_records",
+    "evidence_fragments",
+    "ingestion_runs",
+}
+
+
 def evidence(source_id: str, ordinal: int = 0) -> EvidenceRef:
     return EvidenceRef(
         source_id=source_id,
@@ -104,9 +113,9 @@ def store(engine):
     return SqlAlchemyGraphStore(engine)
 
 
-def test_schema_creates_graph_tables(engine) -> None:
+def test_schema_creates_all_me_core_tables(engine) -> None:
     names = set(inspect(engine).get_table_names())
-    assert names == {"graph_objects", "graph_evidence_refs"}
+    assert names == EXPECTED_TABLES
 
 
 def test_node_round_trip_preserves_json_time_and_ordered_evidence(store) -> None:
