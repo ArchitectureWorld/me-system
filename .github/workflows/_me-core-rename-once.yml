@@ -1,24 +1,20 @@
 name: One-shot ME-Core rename
 
 on:
-  push:
-    branches:
-      - agent/rename-me-core
-    paths:
-      - ".github/me-core-rename-trigger"
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
       - main
     paths:
       - ".github/me-core-rename-trigger"
+      - ".github/workflows/_me-core-rename-once.yml"
 
 permissions:
   contents: write
 
 jobs:
   rename:
-    if: github.head_ref == 'agent/rename-me-core' || github.ref_name == 'agent/rename-me-core'
+    if: github.head_ref == 'agent/rename-me-core'
     runs-on: ubuntu-latest
     steps:
       - name: Check out rename branch
@@ -33,13 +29,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify RED, rename the sole kernel, and test
+      - name: Define naming regression and verify RED
         shell: bash
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
+          set -euxo pipefail
+          exec > >(tee /tmp/01-red.log) 2>&1
           cat > services/me-graph-core/tests/test_me_core_naming.py <<'PY'
           from pathlib import Path
           import tomllib
@@ -54,13 +48,21 @@ jobs:
               assert scripts["me-graph"] == "me_core.cli:main"
               assert scripts["me-graph-mcp"] == "me_core.hermes.mcp_server:main"
           PY
-
           python -m pip install -q -e 'services/me-graph-core[dev]'
-          if (cd services/me-graph-core && pytest -q tests/test_me_core_naming.py); then
+          set +e
+          (cd services/me-graph-core && pytest -q tests/test_me_core_naming.py)
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
             echo "Naming regression test unexpectedly passed before rename" >&2
             exit 1
           fi
 
+      - name: Rename the sole runtime kernel
+        shell: bash
+        run: |
+          set -euxo pipefail
+          exec > >(tee /tmp/02-rename.log) 2>&1
           git mv services/me-graph-core services/me-core
           git mv services/me-core/src/me_graph_core services/me-core/src/me_core
           git mv .github/workflows/me-graph-core.yml .github/workflows/me-core.yml
@@ -79,7 +81,6 @@ jobs:
               Path("integrations/hermes/config.example.yaml"),
               Path("integrations/hermes/ME_SYSTEM_BOOTSTRAP.md"),
           ]
-
           files: list[Path] = []
           for root in roots:
               if root.is_dir():
@@ -127,20 +128,43 @@ jobs:
           workflow.write_text(text, encoding="utf-8")
           PY
 
-          rm -f .github/me-core-rename-trigger
-          rm -f .github/workflows/_me-core-rename-once.yml
-
-          python -m pip uninstall -y me-graph-core >/dev/null 2>&1 || true
+      - name: Install renamed package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          exec > >(tee /tmp/03-install.log) 2>&1
+          python -m pip uninstall -y me-graph-core || true
           python -m pip install -q -e 'services/me-core[dev]'
 
+      - name: Verify renamed core
+        shell: bash
+        run: |
+          set -euxo pipefail
+          exec > >(tee /tmp/04-tests.log) 2>&1
           cd services/me-core
           pytest -q --ignore=tests/test_postgres_integration.py --ignore=tests/test_mcp_stdio.py
           python -m compileall -q src
           python -c 'import me_core; print(me_core.__name__)'
           python -c 'from me_core.hermes.mcp_server import TOOL_NAMES; assert len(TOOL_NAMES) == 6'
           me-system --help >/dev/null
-          cd ../..
 
+      - name: Commit and push rename
+        shell: bash
+        run: |
+          set -euxo pipefail
+          exec > >(tee /tmp/05-push.log) 2>&1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/me-core-rename-trigger
+          rm -f .github/workflows/_me-core-rename-once.yml
           git add -A
           git commit -m "refactor: unify runtime code under ME-Core"
           git push origin HEAD:agent/rename-me-core
+
+      - name: Upload rename diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-core-rename-diagnostics
+          path: /tmp/0*.log
+          if-no-files-found: warn
