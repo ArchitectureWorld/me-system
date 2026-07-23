@@ -12,14 +12,15 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_compose_exposes_only_dashboard_and_keeps_postgres_private() -> None:
+def test_compose_exposes_only_dashboard_on_loopback_and_keeps_postgres_private() -> None:
     text = read(COMPOSE)
     postgres_block = text.split("  postgres:", 1)[1].split("  experience:", 1)[0]
     experience_block = text.split("  experience:", 1)[1]
 
     assert "postgres:16" in postgres_block
     assert "ports:" not in postgres_block
-    assert '"8765:8765"' in experience_block
+    assert '"127.0.0.1:8765:8765"' in experience_block
+    assert '      - "8765:8765"' not in experience_block
     assert "ME_GRAPH_DATABASE_URL" in experience_block
     assert "condition: service_healthy" in experience_block
 
