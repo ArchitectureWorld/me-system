@@ -6,8 +6,17 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect
 
-from me_core.persistence.migrations import upgrade_database
+from me_core.persistence.migrations import _project_root, upgrade_database
 from me_core.persistence.models import Base
+
+
+def test_project_root_can_be_overridden_for_installed_distribution(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ME_SYSTEM_PROJECT_ROOT", str(tmp_path))
+
+    assert _project_root() == tmp_path.resolve()
 
 
 def test_upgrade_database_creates_schema(tmp_path: Path) -> None:
