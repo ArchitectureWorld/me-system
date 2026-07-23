@@ -1,0 +1,22 @@
+mcp_servers:
+  me_system:
+    command: "me-graph-mcp"
+    env:
+      ME_GRAPH_DATABASE_URL: "${ME_GRAPH_DATABASE_URL}"
+      ME_GRAPH_HERMES_USER_ID: "who:user:master"
+      ME_GRAPH_ALLOWED_PROJECT_IDS: "brain:project:lighting-platform"
+      ME_GRAPH_MAX_SUBGRAPH_DEPTH: "2"
+      ME_GRAPH_MCP_LOG_LEVEL: "WARNING"
+    timeout: 120
+    connect_timeout: 30
+    supports_parallel_tool_calls: true
+    tools:
+      include:
+        - brain_resolve_project
+        - brain_get_snapshot
+        - brain_expand_subgraph
+        - brain_trace_decision
+        - brain_get_evidence
+        - who_get_task_profile
+      prompts: false
+      resources: false
