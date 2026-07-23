@@ -2,6 +2,8 @@ name: ME-System root package validation
 
 on:
   pull_request:
+    branches:
+      - main
     paths:
       - "README.md"
       - "docs/**"
@@ -20,7 +22,7 @@ permissions:
 
 jobs:
   unit:
-    if: github.base_ref == 'validation/me-system-package-base'
+    if: github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -40,7 +42,7 @@ jobs:
       - run: python -m compileall -q src
 
   postgres-e2e:
-    if: github.base_ref == 'validation/me-system-package-base'
+    if: github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     services:
       postgres:
