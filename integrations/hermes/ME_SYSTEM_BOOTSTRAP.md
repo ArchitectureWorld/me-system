@@ -1,5 +1,13 @@
 # ME-System Tool Usage
 
+Hermes 会把本 Server 的原始工具名注册为：
+
+```text
+mcp_me_system_<tool_name>
+```
+
+例如 `brain_get_snapshot` 在 Hermes 中通常显示为 `mcp_me_system_brain_get_snapshot`。下面使用原始语义名称描述调用顺序。
+
 - 涉及已有项目、历史决策、项目约束、项目证据或长期协作规则时，先使用 ME-System MCP。
 - 不知道 canonical project ID 时，先调用 `brain_resolve_project`。
 - 默认调用 `brain_get_snapshot`，不要先遍历全部项目文件。
