@@ -2,7 +2,7 @@
 
 > 更新日期：2026-07-23
 
-本文件用于区分当前有效规范、历史研究材料和后续实现方向。
+本文件用于区分当前有效规范、已实现能力、历史研究材料和后续实现方向。
 
 ## 当前有效的最高层决策
 
@@ -22,11 +22,42 @@
 - `docs/specs/me-brain-ontology-v0.1.md`
 - `docs/specs/me-who-ontology-v0.1.md`
 - `services/me-graph-core/schemas/`
+- `docs/superpowers/specs/2026-07-23-postgresql-graph-store-design.md`
 
 ## 当前可运行基线
 
+### 图谱契约与查询
+
 - `services/me-graph-core/`
 - `examples/graph/lighting-platform.json`
+- ME-Brain、ME-Who、Bridge 命名空间；
+- 当前项目快照、决策链、子图、证据和任务画像查询；
+- Candidate 提交、批准和驳回。
+
+### 持久化
+
+- `InMemoryGraphStore`：测试与轻量运行；
+- `SqlAlchemyGraphStore`：PostgreSQL 权威持久化；
+- `graph_objects`：全局唯一的节点与边；
+- `graph_evidence_refs`：有序证据引用；
+- Alembic 初始迁移和迁移幂等性；
+- `db-upgrade`、`import-fixture` 和数据库查询 CLI；
+- `deploy/postgres/`：PostgreSQL 16 Compose 示例。
+
+当前实现已经在 GitHub Actions 中通过 Python 3.11、Python 3.12 和真实 PostgreSQL 服务测试。
+
+## 当前实现边界
+
+以下内容尚未完成：
+
+- 项目名称、工作目录和外部标识的 ID Resolve；
+- Hermes 只读 MCP Server；
+- 文档、对话和 Git 的 CandidateGraphChange Adapter；
+- 未批准 Candidate 与审核日志的跨重启持久化；
+- 字段级 Agent 权限过滤；
+- 图谱治理界面；
+- Pi Extension；
+- 生产规模下的批量证据读取优化。
 
 ## 输入与证据层材料
 
@@ -49,6 +80,16 @@
 - ME-Reader 作为第三条产品线；
 - 独立 Agent Context Gateway 作为系统核心；
 - 在权威图谱之前优先建设完整 Handoff、复杂 Token 编译和多 Agent 编排协议；
-- Agent 直接查询数据库或生成任意 Cypher。
+- Agent 直接查询数据库或生成任意 Cypher；
+- 同时维护多个权威数据库实现。
 
 历史研究内容可通过 Git 历史和已关闭 PR 查看，不继续保留为主分支活动规格。
+
+## 下一实施切片
+
+```text
+项目 ID Resolve
+→ 只读 Graph Query API
+→ Hermes MCP Adapter
+→ “继续推进 lighting-platform”端到端闭环
+```
