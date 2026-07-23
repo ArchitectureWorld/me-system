@@ -21,7 +21,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    """Declarative metadata for the persistent graph store."""
+    """Declarative metadata for the persistent ME-System store."""
 
 
 _JSON = JSON().with_variant(JSONB(), "postgresql")
@@ -95,7 +95,12 @@ class EvidenceRefRecord(Base):
     source_anchor: Mapped[dict[str, object]] = mapped_column(_JSON, nullable=False)
 
 
+# Import after Base and graph records exist so the shared metadata contains the
+# source/evidence/ingestion/candidate tables without a second declarative base.
+from . import ingestion_models as _ingestion_models  # noqa: E402,F401
+
+
 def create_schema(engine: Engine) -> None:
-    """Create the current graph schema for tests and local prototypes."""
+    """Create the current ME-System schema for tests and local prototypes."""
 
     Base.metadata.create_all(engine)
