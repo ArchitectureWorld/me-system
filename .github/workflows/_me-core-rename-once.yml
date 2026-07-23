@@ -1,0 +1,140 @@
+name: One-shot ME-Core rename
+
+on:
+  push:
+    branches:
+      - agent/rename-me-core
+    paths:
+      - ".github/me-core-rename-trigger"
+
+permissions:
+  contents: write
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out rename branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/rename-me-core
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify RED, rename the sole kernel, and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cat > services/me-graph-core/tests/test_me_core_naming.py <<'PY'
+          from pathlib import Path
+          import tomllib
+
+
+          def test_distribution_and_commands_use_me_core_names() -> None:
+              data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+              assert data["project"]["name"] == "me-core"
+              scripts = data["project"]["scripts"]
+              assert scripts["me-system"] == "me_core.cli:main"
+              assert scripts["me-system-mcp"] == "me_core.hermes.mcp_server:main"
+              assert scripts["me-graph"] == "me_core.cli:main"
+              assert scripts["me-graph-mcp"] == "me_core.hermes.mcp_server:main"
+          PY
+
+          python -m pip install -q -e 'services/me-graph-core[dev]'
+          if (cd services/me-graph-core && pytest -q tests/test_me_core_naming.py); then
+            echo "Naming regression test unexpectedly passed before rename" >&2
+            exit 1
+          fi
+
+          git mv services/me-graph-core services/me-core
+          git mv services/me-core/src/me_graph_core services/me-core/src/me_core
+          git mv .github/workflows/me-graph-core.yml .github/workflows/me-core.yml
+
+          python - <<'PY'
+          from pathlib import Path
+
+          roots = [
+              Path("services/me-core"),
+              Path(".github/workflows/me-core.yml"),
+              Path("README.md"),
+              Path("docs/00-product-and-architecture-overview.md"),
+              Path("docs/architecture-status.md"),
+              Path("docs/roadmap/recommended-development-path.md"),
+              Path("integrations/hermes/README.md"),
+              Path("integrations/hermes/config.example.yaml"),
+              Path("integrations/hermes/ME_SYSTEM_BOOTSTRAP.md"),
+          ]
+
+          files: list[Path] = []
+          for root in roots:
+              if root.is_dir():
+                  files.extend(path for path in root.rglob("*") if path.is_file())
+              elif root.exists():
+                  files.append(root)
+
+          replacements = (
+              ("services/me-graph-core", "services/me-core"),
+              ("me_graph_core", "me_core"),
+              ("me-graph-core", "me-core"),
+              ("ME-Graph Core", "ME-Core"),
+          )
+          for path in files:
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              updated = text
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if path in {
+                  Path("README.md"),
+                  Path("services/me-core/README.md"),
+                  Path("integrations/hermes/README.md"),
+                  Path("integrations/hermes/config.example.yaml"),
+              }:
+                  updated = updated.replace("me-graph-mcp", "me-system-mcp")
+                  updated = updated.replace("me-graph ", "me-system ")
+              if updated != text:
+                  path.write_text(updated, encoding="utf-8")
+
+          pyproject = Path("services/me-core/pyproject.toml")
+          text = pyproject.read_text(encoding="utf-8")
+          text = text.replace('name = "me-core"', 'name = "me-core"', 1)
+          old = '''[project.scripts]\nme-graph = "me_core.cli:main"\nme-graph-mcp = "me_core.hermes.mcp_server:main"'''
+          new = '''[project.scripts]\nme-system = "me_core.cli:main"\nme-system-mcp = "me_core.hermes.mcp_server:main"\nme-graph = "me_core.cli:main"\nme-graph-mcp = "me_core.hermes.mcp_server:main"'''
+          if old not in text:
+              raise SystemExit("Expected script block not found in pyproject.toml")
+          pyproject.write_text(text.replace(old, new), encoding="utf-8")
+
+          workflow = Path(".github/workflows/me-core.yml")
+          text = workflow.read_text(encoding="utf-8")
+          text = text.replace("name: ME-Graph Core", "name: ME-Core")
+          text = text.replace("services/me-graph-core", "services/me-core")
+          workflow.write_text(text, encoding="utf-8")
+          PY
+
+          rm -f .github/me-core-rename-trigger
+          rm -f .github/workflows/_me-core-rename-once.yml
+
+          python -m pip uninstall -y me-graph-core >/dev/null 2>&1 || true
+          python -m pip install -q -e 'services/me-core[dev]'
+
+          cd services/me-core
+          pytest -q --ignore=tests/test_postgres_integration.py --ignore=tests/test_mcp_stdio.py
+          python -m compileall -q src
+          python -c 'import me_core; print(me_core.__name__)'
+          python -c 'from me_core.hermes.mcp_server import TOOL_NAMES; assert len(TOOL_NAMES) == 6'
+          me-system --help >/dev/null
+          cd ../..
+
+          git add -A
+          git commit -m "refactor: unify runtime code under ME-Core"
+          git push origin HEAD:agent/rename-me-core
