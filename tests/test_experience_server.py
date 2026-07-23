@@ -73,6 +73,24 @@ def test_server_exposes_health_html_report_and_rerun() -> None:
         thread.join(timeout=2)
 
 
+def test_fatal_startup_report_redacts_database_credentials() -> None:
+    database_url = "postgresql+psycopg://user:super-secret@database:5432/private"
+
+    def runner() -> AcceptanceReport:
+        raise RuntimeError(f"could not connect to {database_url}; password=super-secret")
+
+    application = ExperienceApplication(runner)
+    payload = application.report.to_dict()
+    encoded = json.dumps(payload, ensure_ascii=False)
+
+    assert payload["status"] == "fail"
+    assert "super-secret" not in encoded
+    assert database_url not in encoded
+    assert "[database-url-redacted]" in encoded
+    assert "password=[redacted]" in encoded
+    assert "Traceback" not in encoded
+
+
 def test_server_returns_json_404_without_traceback() -> None:
     application = ExperienceApplication(lambda: make_report(1))
     server = create_server("127.0.0.1", 0, application)
