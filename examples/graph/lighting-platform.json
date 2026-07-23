@@ -1,0 +1,52 @@
+{
+  "schema_version": "graph-fixture-compact/0.1",
+  "defaults": {
+    "valid_from": "2026-07-14T00:00:00Z",
+    "authority": "canonical",
+    "confirmation_status": "human_confirmed",
+    "brain_sensitivity": "project_private",
+    "who_sensitivity": "personal_private",
+    "source": {
+      "source_id": "src:conversation:2026-07-14",
+      "document_id": "doc:lighting:conversation-notes",
+      "version_id": "docv:lighting:conversation-notes:1",
+      "anchor_type": "conversation_message"
+    }
+  },
+  "nodes": [
+    {"id":"brain:project:lighting-platform","graph":"me_brain","type":"Project","label":"lighting-platform","properties":{"stage":"schema-design","goal":"建立可扩展照明计算平台"},"anchor":"project-definition"},
+    {"id":"brain:decision:radiance-primary","graph":"me_brain","type":"Decision","label":"Radiance 作为主计算核心","properties":{"decision":"primary_engine","value":"Radiance"},"anchor":"lighting-decision-14"},
+    {"id":"brain:decision:cycles-primary","graph":"me_brain","type":"Decision","label":"Cycles 作为主计算核心","properties":{"decision":"primary_engine","value":"Cycles"},"status":"superseded","valid_from":"2026-06-20T00:00:00Z","valid_to":"2026-07-14T00:00:00Z","anchor":"lighting-decision-old"},
+    {"id":"brain:decision:ifc-primary-input","graph":"me_brain","type":"Decision","label":"IFC 作为第一阶段主要输入","properties":{"decision":"primary_input","value":"IFC"},"anchor":"ifc-decision-14"},
+    {"id":"brain:decision:usd-future-option","graph":"me_brain","type":"Decision","label":"USD 作为未来扩展选项","properties":{"decision":"future_input","value":"USD"},"status":"future_planned","anchor":"usd-option-14"},
+    {"id":"brain:constraint:artificial-light-only","graph":"me_brain","type":"Constraint","label":"第一阶段只考虑人工照明","properties":{"scope":"lighting_calculation"},"anchor":"artificial-light-scope"},
+    {"id":"brain:requirement:accurate-lighting-calculation","graph":"me_brain","type":"Requirement","label":"照明计算结果必须可验证","properties":{"priority":"high"},"anchor":"accuracy-requirement"},
+    {"id":"brain:task:material-schema","graph":"me_brain","type":"Task","label":"建立材料参数 Schema","properties":{"status":"blocked","owner":"agent"},"anchor":"material-task"},
+    {"id":"brain:issue:material-parameters-unstable","graph":"me_brain","type":"Issue","label":"材料参数规范尚未稳定","properties":{"severity":"high"},"anchor":"material-issue"},
+    {"id":"brain:artifact:architecture-spec-v01","graph":"me_brain","type":"Artifact","label":"照明平台架构规格 v0.1","properties":{"artifact_type":"architecture_spec"},"anchor":"architecture-artifact"},
+    {"id":"who:user:master","graph":"me_who","type":"User","label":"Master","properties":{"preferred_language":"zh-CN"},"anchor":"user-profile"},
+    {"id":"who:role:architectural-engineer","graph":"me_who","type":"Role","label":"建筑工程师","properties":{"domains":["architecture","engineering"]},"anchor":"role-profile"},
+    {"id":"who:capability:bim","graph":"me_who","type":"Capability","label":"BIM 与数字建造","properties":{"level":"experienced"},"anchor":"capability-bim"},
+    {"id":"who:collaboration-rule:architecture-first","graph":"me_who","type":"CollaborationRule","label":"架构问题先收敛再实现","properties":{"task_types":["technical_architecture","product_design"],"project_ids":["brain:project:lighting-platform"]},"anchor":"rule-architecture-first"},
+    {"id":"who:collaboration-rule:direct-execution","graph":"me_who","type":"CollaborationRule","label":"明确实现任务直接执行，不重复确认","properties":{"task_types":["implementation","bugfix"],"project_ids":["brain:project:lighting-platform"]},"anchor":"rule-direct-execution"}
+  ],
+  "edges": [
+    {"id":"edge:project-has-radiance","graph":"me_brain","type":"HAS_DECISION","from_id":"brain:project:lighting-platform","to_id":"brain:decision:radiance-primary","anchor":"lighting-decision-14"},
+    {"id":"edge:radiance-supersedes-cycles","graph":"me_brain","type":"SUPERSEDES","from_id":"brain:decision:radiance-primary","to_id":"brain:decision:cycles-primary","anchor":"lighting-decision-14"},
+    {"id":"edge:project-has-ifc","graph":"me_brain","type":"HAS_DECISION","from_id":"brain:project:lighting-platform","to_id":"brain:decision:ifc-primary-input","anchor":"ifc-decision-14"},
+    {"id":"edge:project-has-usd-option","graph":"me_brain","type":"HAS_DECISION","from_id":"brain:project:lighting-platform","to_id":"brain:decision:usd-future-option","anchor":"usd-option-14"},
+    {"id":"edge:project-has-artificial-constraint","graph":"me_brain","type":"HAS_CONSTRAINT","from_id":"brain:project:lighting-platform","to_id":"brain:constraint:artificial-light-only","anchor":"artificial-light-scope"},
+    {"id":"edge:project-has-requirement","graph":"me_brain","type":"HAS_REQUIREMENT","from_id":"brain:project:lighting-platform","to_id":"brain:requirement:accurate-lighting-calculation","anchor":"accuracy-requirement"},
+    {"id":"edge:radiance-satisfies-requirement","graph":"me_brain","type":"SATISFIES","from_id":"brain:decision:radiance-primary","to_id":"brain:requirement:accurate-lighting-calculation","anchor":"lighting-decision-14"},
+    {"id":"edge:project-has-task","graph":"me_brain","type":"HAS_TASK","from_id":"brain:project:lighting-platform","to_id":"brain:task:material-schema","anchor":"material-task"},
+    {"id":"edge:project-has-issue","graph":"me_brain","type":"HAS_ISSUE","from_id":"brain:project:lighting-platform","to_id":"brain:issue:material-parameters-unstable","anchor":"material-issue"},
+    {"id":"edge:issue-blocks-task","graph":"me_brain","type":"BLOCKS","from_id":"brain:issue:material-parameters-unstable","to_id":"brain:task:material-schema","anchor":"material-issue"},
+    {"id":"edge:project-has-artifact","graph":"me_brain","type":"HAS_ARTIFACT","from_id":"brain:project:lighting-platform","to_id":"brain:artifact:architecture-spec-v01","anchor":"architecture-artifact"},
+    {"id":"edge:artifact-implements-radiance","graph":"me_brain","type":"IMPLEMENTS","from_id":"brain:artifact:architecture-spec-v01","to_id":"brain:decision:radiance-primary","anchor":"architecture-artifact"},
+    {"id":"edge:user-has-role","graph":"me_who","type":"HAS_ROLE","from_id":"who:user:master","to_id":"who:role:architectural-engineer","anchor":"role-profile"},
+    {"id":"edge:user-has-capability-bim","graph":"me_who","type":"HAS_CAPABILITY","from_id":"who:user:master","to_id":"who:capability:bim","anchor":"capability-bim"},
+    {"id":"edge:user-has-rule-architecture-first","graph":"me_who","type":"HAS_COLLABORATION_RULE","from_id":"who:user:master","to_id":"who:collaboration-rule:architecture-first","anchor":"rule-architecture-first"},
+    {"id":"edge:user-has-rule-direct-execution","graph":"me_who","type":"HAS_COLLABORATION_RULE","from_id":"who:user:master","to_id":"who:collaboration-rule:direct-execution","anchor":"rule-direct-execution"},
+    {"id":"edge:bridge:user-participates-lighting","graph":"bridge","type":"PARTICIPATES_IN","from_id":"who:user:master","to_id":"brain:project:lighting-platform","anchor":"user-project-bridge"}
+  ]
+}
