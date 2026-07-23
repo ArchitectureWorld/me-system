@@ -8,6 +8,7 @@ from typing import Callable
 
 from .contracts import AcceptanceCheck, AcceptanceReport, CheckStatus
 from .renderer import render_report_html
+from .security import sanitize_error
 
 
 ReportRunner = Callable[[], AcceptanceReport]
@@ -15,8 +16,6 @@ ReportRunner = Callable[[], AcceptanceReport]
 
 def _fatal_report(exc: Exception) -> AcceptanceReport:
     now = datetime.now(timezone.utc)
-    message = (str(exc).strip() or type(exc).__name__)[:320]
-    message = message.replace("Traceback", "错误详情")
     return AcceptanceReport(
         run_id=f"experience:fatal-{now.strftime('%H%M%S')}",
         started_at=now,
@@ -30,7 +29,7 @@ def _fatal_report(exc: Exception) -> AcceptanceReport:
                 evidence={},
                 duration_ms=0,
                 error_type=type(exc).__name__,
-                error_message=message,
+                error_message=sanitize_error(exc),
             ),
         ),
         highlights={"next_action": "查看 Docker experience 服务日志"},
@@ -99,6 +98,15 @@ def _handler_class() -> type[BaseHTTPRequestHandler]:
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "script-src 'self' 'unsafe-inline'; connect-src 'self'; "
+                "img-src 'self' data:; frame-ancestors 'none'; "
+                "base-uri 'none'; form-action 'self'",
+            )
             if disposition is not None:
                 self.send_header("Content-Disposition", disposition)
             self.end_headers()
