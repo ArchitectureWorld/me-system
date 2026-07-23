@@ -38,7 +38,18 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: python -m pip install -q -e '.[dev]'
-      - run: pytest -q --tb=short --ignore=tests/test_mcp_stdio.py --ignore=tests/compat/runtime/test_postgres_integration.py
+      - name: Run unit and contract tests
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! pytest -q --tb=short \
+            --ignore=tests/test_mcp_stdio.py \
+            --ignore=tests/compat/runtime/test_postgres_integration.py \
+            > /tmp/pytest-unit.log 2>&1; then
+            tail -n 160 /tmp/pytest-unit.log
+            exit 1
+          fi
+          cat /tmp/pytest-unit.log
       - run: python -m compileall -q src
 
   postgres-e2e:
@@ -67,4 +78,15 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: python -m pip install -q -e '.[dev]'
-      - run: pytest -q --tb=short tests/compat/runtime/test_postgres_integration.py tests/test_mcp_stdio.py
+      - name: Run PostgreSQL and stdio MCP end-to-end tests
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! pytest -q --tb=short \
+            tests/compat/runtime/test_postgres_integration.py \
+            tests/test_mcp_stdio.py \
+            > /tmp/pytest-e2e.log 2>&1; then
+            tail -n 160 /tmp/pytest-e2e.log
+            exit 1
+          fi
+          cat /tmp/pytest-e2e.log
