@@ -96,3 +96,18 @@ def test_fixture_query_is_not_overridden_by_database_environment(capsys, monkeyp
     assert code == 0
     snapshot = payload(capsys.readouterr().out)
     assert snapshot["root_ids"] == ["brain:project:lighting-platform"]
+
+
+def test_database_failure_does_not_echo_password(capsys) -> None:
+    code = main(
+        [
+            "project-snapshot",
+            "--database-url",
+            "postgresql+psycopg://user:super-secret@127.0.0.1:1/missing",
+            "--project-id",
+            "brain:project:lighting-platform",
+        ]
+    )
+    assert code == 2
+    error = capsys.readouterr().err
+    assert "super-secret" not in error
