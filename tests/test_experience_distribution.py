@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -40,6 +41,11 @@ def test_all_launchers_use_the_same_compose_and_dashboard_url() -> None:
         assert "deploy/experience/compose.yml" in text.replace("\\", "/")
         assert "http://localhost:8765" in text
         assert "docker compose" in text
+
+
+def test_unix_launchers_are_executable_after_checkout() -> None:
+    for path in [ROOT / "体验.sh", ROOT / "体验.command", ROOT / "停止体验.sh"]:
+        assert os.access(path, os.X_OK), f"{path.name} must be executable"
 
 
 def test_stop_launchers_remove_only_experience_stack() -> None:
