@@ -27,13 +27,6 @@ def _aware(value: datetime | None) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
-def _is_unique_violation(exc: IntegrityError) -> bool:
-    sqlstate = getattr(exc.orig, "sqlstate", None)
-    if sqlstate == "23505":
-        return True
-    return "unique constraint" in str(exc.orig).lower()
-
-
 def _validate_edge_namespace(edge: GraphEdge, from_node: GraphNode, to_node: GraphNode) -> None:
     if edge.graph is GraphNamespace.BRIDGE:
         if from_node.graph is to_node.graph:
@@ -161,11 +154,7 @@ def _to_edge(session: Session, row: GraphObjectRecord) -> GraphEdge:
 
 
 class SqlAlchemyGraphStore:
-    """SQLAlchemy-backed canonical graph store.
-
-    Domain dataclasses remain authoritative. Database records are always
-    reconstructed through ``GraphNode.from_dict`` or ``GraphEdge.from_dict``.
-    """
+    """SQLAlchemy-backed canonical graph store with deterministic round trips."""
 
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
@@ -176,13 +165,12 @@ class SqlAlchemyGraphStore:
             with self._sessions.begin() as session:
                 self._ensure_available_id(session, node.id)
                 session.add(_node_record(node))
-                session.flush()
+                self._flush_graph_object(session, node.id)
                 session.add_all(_evidence_records(node.id, node.source_refs))
+                session.flush()
         except DuplicateGraphObjectError:
             raise
         except IntegrityError as exc:
-            if _is_unique_violation(exc):
-                raise DuplicateGraphObjectError(f"graph object already exists: {node.id}") from exc
             raise GraphStoreUnavailableError("unable to persist graph node") from exc
         except SQLAlchemyError as exc:
             raise GraphStoreUnavailableError("unable to persist graph node") from exc
@@ -195,13 +183,12 @@ class SqlAlchemyGraphStore:
                 to_node = self._get_node(session, edge.to_id)
                 _validate_edge_namespace(edge, from_node, to_node)
                 session.add(_edge_record(edge))
-                session.flush()
+                self._flush_graph_object(session, edge.id)
                 session.add_all(_evidence_records(edge.id, edge.source_refs))
+                session.flush()
         except (DuplicateGraphObjectError, GraphObjectNotFoundError, GraphNamespaceError):
             raise
         except IntegrityError as exc:
-            if _is_unique_violation(exc):
-                raise DuplicateGraphObjectError(f"graph object already exists: {edge.id}") from exc
             raise GraphStoreUnavailableError("unable to persist graph edge") from exc
         except SQLAlchemyError as exc:
             raise GraphStoreUnavailableError("unable to persist graph edge") from exc
@@ -262,18 +249,25 @@ class SqlAlchemyGraphStore:
         try:
             with self._sessions() as session:
                 self._get_node(session, node_id)
-                statement = select(GraphObjectRecord).where(GraphObjectRecord.object_kind == "edge")
+                statement = select(GraphObjectRecord).where(
+                    GraphObjectRecord.object_kind == "edge"
+                )
                 if edge_types is not None:
                     if not edge_types:
                         return ()
-                    statement = statement.where(GraphObjectRecord.object_type.in_(sorted(edge_types)))
+                    statement = statement.where(
+                        GraphObjectRecord.object_type.in_(sorted(edge_types))
+                    )
                 if direction == "out":
                     statement = statement.where(GraphObjectRecord.from_id == node_id)
                 elif direction == "in":
                     statement = statement.where(GraphObjectRecord.to_id == node_id)
                 else:
                     statement = statement.where(
-                        or_(GraphObjectRecord.from_id == node_id, GraphObjectRecord.to_id == node_id)
+                        or_(
+                            GraphObjectRecord.from_id == node_id,
+                            GraphObjectRecord.to_id == node_id,
+                        )
                     )
                 rows = session.scalars(statement.order_by(GraphObjectRecord.id)).all()
                 return tuple(_to_edge(session, row) for row in rows)
@@ -285,6 +279,15 @@ class SqlAlchemyGraphStore:
     def _ensure_available_id(self, session: Session, object_id: str) -> None:
         if session.get(GraphObjectRecord, object_id) is not None:
             raise DuplicateGraphObjectError(f"graph object already exists: {object_id}")
+
+    @staticmethod
+    def _flush_graph_object(session: Session, object_id: str) -> None:
+        try:
+            session.flush()
+        except IntegrityError as exc:
+            raise DuplicateGraphObjectError(
+                f"graph object already exists: {object_id}"
+            ) from exc
 
     def _get_node(self, session: Session, node_id: str) -> GraphNode:
         row = session.get(GraphObjectRecord, node_id)
