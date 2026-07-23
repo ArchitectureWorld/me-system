@@ -20,8 +20,6 @@ dev = ["pytest>=8", "jsonschema>=4.20"]
 [project.scripts]
 me-system = "me_system.cli:main"
 me-system-mcp = "me_system.hermes.mcp_server:main"
-me-graph = "me_system.cli:main"
-me-graph-mcp = "me_system.hermes.mcp_server:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
