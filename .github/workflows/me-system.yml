@@ -16,16 +16,13 @@ on:
       - "examples/graph/**"
       - "deploy/postgres/**"
       - ".github/workflows/me-system.yml"
-  push:
-    branches:
-      - agent/unify-me-system-package
 
 permissions:
   contents: read
 
 jobs:
   unit:
-    if: github.event_name == 'push' || github.head_ref == 'agent/unify-me-system-package'
+    if: github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -66,7 +63,7 @@ jobs:
       - run: python -m compileall -q src
 
   postgres-e2e:
-    if: github.event_name == 'push' || github.head_ref == 'agent/unify-me-system-package'
+    if: github.head_ref == 'agent/unify-me-system-package'
     runs-on: ubuntu-latest
     services:
       postgres:
