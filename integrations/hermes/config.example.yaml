@@ -2,7 +2,10 @@ mcp_servers:
   me_system:
     command: "me-graph-mcp"
     env:
-      ME_GRAPH_DATABASE_URL: "${ME_GRAPH_DATABASE_URL}"
+      # Hermes currently passes explicit env values to stdio MCP servers.
+      # Replace this placeholder in your local ~/.hermes/config.yaml and
+      # restrict that file to your user account. Do not commit the real URL.
+      ME_GRAPH_DATABASE_URL: "postgresql+psycopg://me_graph_reader:REPLACE_ME@127.0.0.1:5432/me_graph"
       ME_GRAPH_HERMES_USER_ID: "who:user:master"
       ME_GRAPH_ALLOWED_PROJECT_IDS: "brain:project:lighting-platform"
       ME_GRAPH_MAX_SUBGRAPH_DEPTH: "2"
