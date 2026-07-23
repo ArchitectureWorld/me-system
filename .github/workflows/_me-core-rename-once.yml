@@ -24,12 +24,24 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
+      - name: Detect whether rename is still needed
+        id: detect
+        shell: bash
+        run: |
+          if [ -d services/me-graph-core ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
+        if: steps.detect.outputs.needed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Define naming regression and verify RED
+        if: steps.detect.outputs.needed == 'true'
         shell: bash
         run: |
           set -euxo pipefail
@@ -59,20 +71,19 @@ jobs:
           fi
 
       - name: Rename the sole runtime kernel
+        if: steps.detect.outputs.needed == 'true'
         shell: bash
         run: |
           set -euxo pipefail
           exec > >(tee /tmp/02-rename.log) 2>&1
           git mv services/me-graph-core services/me-core
           git mv services/me-core/src/me_graph_core services/me-core/src/me_core
-          git mv .github/workflows/me-graph-core.yml .github/workflows/me-core.yml
 
           python - <<'PY'
           from pathlib import Path
 
           roots = [
               Path("services/me-core"),
-              Path(".github/workflows/me-core.yml"),
               Path("README.md"),
               Path("docs/00-product-and-architecture-overview.md"),
               Path("docs/architecture-status.md"),
@@ -120,15 +131,17 @@ jobs:
           if old not in text:
               raise SystemExit("Expected script block not found in pyproject.toml")
           pyproject.write_text(text.replace(old, new), encoding="utf-8")
-
-          workflow = Path(".github/workflows/me-core.yml")
-          text = workflow.read_text(encoding="utf-8")
-          text = text.replace("name: ME-Graph Core", "name: ME-Core")
-          text = text.replace("services/me-graph-core", "services/me-core")
-          workflow.write_text(text, encoding="utf-8")
           PY
 
+          cat > services/me-core/.gitignore <<'EOF'
+          __pycache__/
+          *.py[cod]
+          *.egg-info/
+          .pytest_cache/
+          EOF
+
       - name: Install renamed package
+        if: steps.detect.outputs.needed == 'true'
         shell: bash
         run: |
           set -euxo pipefail
@@ -137,6 +150,7 @@ jobs:
           python -m pip install -q -e 'services/me-core[dev]'
 
       - name: Verify renamed core
+        if: steps.detect.outputs.needed == 'true'
         shell: bash
         run: |
           set -euxo pipefail
@@ -149,20 +163,21 @@ jobs:
           me-system --help >/dev/null
 
       - name: Commit and push rename
+        if: steps.detect.outputs.needed == 'true'
         shell: bash
         run: |
           set -euxo pipefail
           exec > >(tee /tmp/05-push.log) 2>&1
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          find services/me-core -type d \( -name __pycache__ -o -name .pytest_cache -o -name '*.egg-info' \) -prune -exec rm -rf {} +
           rm -f .github/me-core-rename-trigger
-          rm -f .github/workflows/_me-core-rename-once.yml
           git add -A
           git commit -m "refactor: unify runtime code under ME-Core"
           git push origin HEAD:agent/rename-me-core
 
       - name: Upload rename diagnostics
-        if: always()
+        if: always() && steps.detect.outputs.needed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: me-core-rename-diagnostics
