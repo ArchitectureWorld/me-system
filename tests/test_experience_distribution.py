@@ -23,11 +23,12 @@ def test_compose_exposes_only_dashboard_and_keeps_postgres_private() -> None:
     assert "condition: service_healthy" in experience_block
 
 
-def test_dockerfile_runs_real_experience_module() -> None:
+def test_dockerfile_runs_real_experience_module_with_migration_root() -> None:
     text = read(ROOT / "deploy" / "experience" / "Dockerfile")
 
     assert "FROM python:3.12" in text
     assert "pip install --no-cache-dir ." in text
+    assert "ME_SYSTEM_PROJECT_ROOT=/app" in text
     assert '"-m", "me_system.experience"' in text
     assert "EXPOSE 8765" in text
 
