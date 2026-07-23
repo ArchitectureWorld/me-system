@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from alembic import command
@@ -12,6 +13,9 @@ from .database import create_database_engine, redact_database_url
 
 
 def _project_root() -> Path:
+    configured = os.getenv("ME_SYSTEM_PROJECT_ROOT")
+    if configured:
+        return Path(configured).expanduser().resolve()
     return Path(__file__).resolve().parents[3]
 
 
