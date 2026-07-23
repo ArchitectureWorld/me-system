@@ -166,16 +166,21 @@ def test_running_run_can_finish_with_non_success_terminal_state(status: Ingestio
 
 
 @pytest.mark.parametrize(
-    "counts",
+    "count_values",
     [
-        IngestionCounts(input_item_count=-1),
-        IngestionCounts(input_item_count=1, processed_item_count=2),
-        IngestionCounts(input_item_count=2, processed_item_count=1, skipped_item_count=1, failed_item_count=1),
+        {"input_item_count": -1},
+        {"input_item_count": 1, "processed_item_count": 2},
+        {
+            "input_item_count": 2,
+            "processed_item_count": 1,
+            "skipped_item_count": 1,
+            "failed_item_count": 1,
+        },
     ],
 )
-def test_ingestion_counts_reject_invalid_values(counts: IngestionCounts) -> None:
+def test_ingestion_counts_reject_invalid_values(count_values: dict[str, int]) -> None:
     with pytest.raises(ContractValidationError):
-        pending_run(counts=counts)
+        IngestionCounts(**count_values)
 
 
 @pytest.mark.parametrize("coverage", [-0.1, 1.1])
