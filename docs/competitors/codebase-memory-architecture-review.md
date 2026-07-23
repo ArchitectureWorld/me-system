@@ -1,285 +1,189 @@
-# Codebase-Memory 架构 Review 与 ME-System 吸收方案
+# Codebase-Memory 架构 Review：ME-Brain 与 ME-Who 的吸收方案
 
 > Review 日期：2026-07-23  
-> 参考项目：`DeusData/codebase-memory-mcp`  
-> 目标：提炼可用于 ME-System 双图谱与 MCP 的架构原则，而不是复制其技术栈。
+> 参考项目：[`DeusData/codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp)  
+> 目的：让 ME-Brain 与 ME-Who 参考其图谱构建、查询和 MCP 方法，不复制其具体技术栈。
 
-## 1. 核心判断
+## 一、结论
 
-Codebase-Memory 真正值得吸收的不是 Tree-sitter、C 或 SQLite，而是以下产品结构：
-
-```text
-确定性输入解析
-→ 多阶段结构索引
-→ 持久化知识图谱
-→ 少量结构化查询工具
-→ MCP / CLI 共用同一后端
-→ Agent 负责自然语言理解
-```
-
-它把自身定位为结构分析后端，而不是 Chatbot：后端不嵌入负责回答问题的 LLM；现有 Agent 承担自然语言理解和工具选择，结构后端负责可重复的索引与查询。
-
-ME-System 应采用同样的单核心原则：
+ME-System 只有两个产品图谱：
 
 ```text
 ME-System
-└── ME-Core
-    ├── 输入与证据
-    ├── 候选缓冲区
-    ├── ME-Brain Graph
-    ├── ME-Who Graph
-    ├── 查询与投影
-    ├── 质量状态
-    ├── MCP
-    └── CLI
+├── ME-Brain
+└── ME-Who
 ```
 
-ME-Brain 与 ME-Who 是两个业务图谱域，但不是两个工程核心；MCP、Source Ledger 和 Candidate Queue 也都不是额外核心。
-
-## 2. Codebase-Memory 的关键架构优势
-
-### 2.1 单一结构后端
-
-其源码把 Store、Pipeline、Graph Buffer、MCP、Watcher 和 CLI 分成可理解的模块，但都围绕同一个持久化结构后端工作。
-
-对 ME-System 的落点：
-
-- `services/me-core` 是唯一内核；
-- Source Ledger 和 Candidate Buffer 进入同一内核；
-- Hermes/Pi Adapter 不复制查询逻辑；
-- Domain Pack 是插件，不是新产品或新服务；
-- PostgreSQL 是唯一权威存储。
-
-### 2.2 多阶段 Pipeline
-
-Codebase-Memory 不是“一次解析直接完成全部关系”，而是通过 definitions、calls、usages、tests、routes、semantic edges、git history 等多个 Pass 增量丰富图谱。
-
-对 ME-System 的落点：
+Codebase-Memory 不是第三条产品线，也不是要被嵌入的额外核心。它提供的是一套值得参考的方法：
 
 ```text
-Pass 1  来源发现与身份确认
-Pass 2  内容标准化与 EvidenceFragment
-Pass 3  实体/事件/事实候选抽取
-Pass 4  实体消歧与项目归属
-Pass 5  冲突、替代和时间检查
-Pass 6  Candidate 审核
-Pass 7  权威图谱提交
-Pass 8  派生摘要、全文和向量索引
+先解析并建立持久化结构图谱
+→ 再让 Agent 通过类型化 MCP 查询
+→ 默认返回紧凑结构
+→ 必要时下钻关系、证据和原文
 ```
 
-每个 Pass 只完成一种职责，并记录版本、覆盖率和质量。
+共享存储、来源、权限、摄取和 MCP 代码属于内部 `shared/` 实现，不拥有第三个产品名称。
 
-### 2.3 Persistent Graph First
+---
 
-Codebase-Memory 先把结构转成持久化图谱，再让 Agent 查询，而不是让 Agent 每次读取原始文件。
+# 二、Codebase-Memory 最值得吸收的逻辑
 
-对 ME-System 的落点：
+## 1. 图谱先于 Agent 文件探索
 
-- Agent 默认读 `GraphSlice`；
-- 原始文件只在证据核查时下钻；
-- 当前事实和历史事实由图谱时间模型区分；
-- 不把 Markdown 投影或 RAG Chunk 当权威数据。
+Codebase-Memory 先将代码库索引为持久化知识图谱，再回答结构查询。Agent 不需要为每次任务重新执行大量目录遍历、grep 和文件读取。
 
-### 2.4 结构化 MCP 工具
-
-其 MCP 工具具有明确输入结构、统一输出以及只读/破坏性/幂等等行为说明，并围绕结构查询而非任意文本问答设计。
-
-对 ME-System 的落点：
-
-- 建立单一 Tool Registry；
-- Tool Registry 同时生成 MCP 注册、CLI 帮助、工具文档和契约测试；
-- 工具显式标记 read-only、destructive、idempotent；
-- Hermes 使用 `coordinator` Profile；
-- Pi/Codex 后续使用更小的 `executor` Profile。
-
-### 2.5 Compact First
-
-Codebase-Memory 默认返回紧凑结构结果，只有明确请求时才返回更深层关系或源代码；查询支持 limit/offset 等范围控制，并有索引状态工具帮助 Agent 判断覆盖范围。
-
-对 ME-System 的落点：
+ME-System 对应采用：
 
 ```text
-compact：节点 ID、类型、标签、状态、关键关系
-standard：增加属性、时间和证据句柄
-full：按授权增加完整属性和证据片段
+原始来源
+→ 标准化和结构抽取
+→ 持久化 ME-Brain / ME-Who 图谱
+→ GraphSlice
+→ Agent
 ```
 
-所有列表和子图查询逐步统一返回：
+这意味着：
 
-- `total`；
-- `returned`；
-- `truncated`；
-- `next_cursor`；
-- `quality` / `coverage`。
+- ME-Brain 不只是文档检索层；
+- ME-Who 不只是用户摘要文件；
+- GraphSlice 是从权威图谱裁剪的运行时结果；
+- 原始材料只在证据核验时读取。
 
-### 2.6 CLI 与 MCP 对等
+## 2. 后端不负责聊天回答
 
-Codebase-Memory 的主要 MCP 能力也可以通过 CLI 调用，便于调试和自动化。
+Codebase-Memory 的结构后端不内置一个负责最终回答的 LLM。Agent 是自然语言理解层，后端负责确定性的索引、存储和查询。
 
-对 ME-System 的落点：
-
-- MCP Tool 不直接实现业务逻辑；
-- MCP 与 CLI 共用 Application Service；
-- 每个新增查询先提供纯 Python 服务和 CLI 验收，再暴露 MCP；
-- 协议测试之外保留可重复的命令行验收。
-
-### 2.7 Project Scope
-
-Codebase-Memory 的主要查询围绕具体项目执行，避免跨库混淆。
-
-对 ME-System 的落点：
-
-- ME-Brain 查询必须有 canonical `project_id`；
-- Project Resolver 只做确定性匹配；
-- ME-Who 数据根据用户、项目、任务和 Agent Profile 裁剪；
-- 禁止全库模糊匹配自动扩大权限。
-
-### 2.8 Index Status 与 Coverage
-
-Codebase-Memory 把索引状态和覆盖范围作为一等能力，避免 Agent 把“尚未索引”误认为“不存在”。
-
-对 ME-System 的落点：
-
-Ingestion Run 必须提供：
-
-- Adapter 与版本；
-- 输入总量；
-- 成功处理数；
-- 跳过和失败数；
-- Evidence Fragment 数；
-- Candidate 数；
-- 未识别范围；
-- 是否 partial；
-- 质量报告和日志句柄。
-
-未来 MCP 可以增加只读：
+ME-System 应保持：
 
 ```text
-graph_get_schema
-ingestion_get_status
-graph_get_coverage
+Agent：理解意图、选择工具、解释结果
+ME-Brain / ME-Who：返回结构事实和证据
 ```
 
-但在输入与候选持久化完成前，不扩张当前六工具表面。
+模型可以参与 Candidate 抽取，但不能静默决定权威事实。
 
-### 2.9 Incremental and Local
+## 3. 多阶段 Pass，而不是一个万能解析器
 
-Codebase-Memory 支持本地持久化和增量更新。
+Codebase-Memory 使用多阶段 Pipeline 分别构建 definitions、calls、usages、tests、routes、git history 等结构。
 
-对 ME-System 的落点：
-
-- SourceRecord 使用幂等键和内容哈希；
-- Adapter 重跑只处理变化来源；
-- Candidate 使用幂等键；
-- 权威图谱按 ChangeSet 增量提交；
-- Linux/NAS 本地部署仍是第一优先级。
-
-### 2.10 前端薄、内核厚
-
-Codebase-Memory 的 MCP 和 CLI 都是结构后端的入口，不各自维护一套索引和查询模型。
-
-对 ME-System 的落点：
+ME-Brain 与 ME-Who 也应采用 Pass：
 
 ```text
-ME-Core Application Services
-          │
-     ┌────┼────┐
-     ▼    ▼    ▼
-    MCP  CLI  Web
+Pass 1  发现来源
+Pass 2  标准化 EvidenceFragment
+Pass 3  提取节点候选
+Pass 4  提取关系候选
+Pass 5  实体消歧和归属
+Pass 6  时间、冲突和替代检查
+Pass 7  审核与权威提交
+Pass 8  派生全文、向量和摘要索引
 ```
 
-所有前端必须依赖同一业务服务和同一权限语义。
+每个 Pass：
 
-## 3. 不应照搬的能力
+- 单一职责；
+- 明确版本；
+- 可独立测试；
+- 支持增量重跑；
+- 输出覆盖率和质量状态。
 
-### 3.1 任意 Cypher 查询
+## 4. 类型化 MCP，而不是泛化 Search
 
-Codebase-Memory 的代码图主要是工程结构，提供只读 Cypher 风险相对可控。ME-System 包含 ME-Who 敏感数据，任意查询可能绕过字段、项目和任务范围。
+Codebase-Memory 提供面向代码结构的专用工具，如架构概览、调用链、变更影响、图谱 Schema 和索引状态。
 
-结论：
+ME-System 同样应围绕两个图谱域提供类型化工具：
 
-- 不向普通 Agent 暴露任意 Cypher；
-- 只保留类型化 Tool；
-- 管理员查询若未来增加，必须独立权限和审计。
-
-### 3.2 自动索引直接成为权威事实
-
-AST、函数和调用关系大多可以确定性重建；用户偏好、项目决策和研究结论可能有歧义。
-
-结论：
-
-- 确定性结构可由规则确认；
-- 语义事实进入 Candidate；
-- Adapter 不能绕过 Candidate Review。
-
-### 3.3 SQLite 单项目数据库
-
-Codebase-Memory 的使用单位是本地代码项目；ME-System 需要跨项目、跨来源、审核事务和长期 ME-Who。
-
-结论：继续使用一个 PostgreSQL 权威库，不改为每项目 SQLite。
-
-### 3.4 大量工具一次开放
-
-Codebase-Memory 已形成成熟产品，可以提供较完整工具面。ME-System 仍处于核心语义验证期。
-
-结论：
-
-- Hermes 当前保持六个只读工具；
-- 新增工具必须证明能降低 Token、提升准确率或暴露必要质量状态；
-- 优先做 schema/status/coverage，后做通用搜索；
-- 写工具在 Candidate 持久化和审计完成后再开放。
-
-### 3.5 单一静态二进制
-
-这是部署优势，但不是当前 ME-System 的首要约束。
-
-结论：先稳定 Python/PostgreSQL 语义；后续以容器、wheel 或原生组件优化部署。
-
-### 3.6 自动写入多个 Agent 配置
-
-Codebase-Memory 面向通用代码 Agent，自动配置多个客户端具有明显产品价值。ME-System 的 ME-Who 涉及敏感信息，接入必须显式授权。
-
-结论：
-
-- 不自动把 ME-Who 权限授予所有 Agent；
-- 每个 Adapter 使用独立 Profile 和 allowlist；
-- 默认只有 Hermes 访问任务相关 ME-Who。
-
-## 4. 对当前 PR #5 的具体调整
-
-### 4.1 Source Ledger 不是第二核心
-
-Source Ledger 调整为 ME-Core 内部的 `ingestion` 子系统：
+### ME-Brain
 
 ```text
-me_core.ingestion
-├── contracts
-├── source_repository
-├── candidate_repository
-├── review
-├── status
-└── pipeline
+brain_resolve_project
+brain_get_snapshot
+brain_expand_subgraph
+brain_trace_decision
+brain_get_evidence
+brain_get_status          后续
+brain_get_schema          后续
+brain_analyze_impact      后续
 ```
 
-### 4.2 Candidate Queue 是 Graph Buffer
-
-参考 Codebase-Memory 的 Graph Buffer 边界，但 ME-System 的 Buffer 是可审计、可持久化的语义缓冲区：
+### ME-Who
 
 ```text
-EvidenceFragment
-→ CandidateGraphChange
-→ Candidate Buffer
-→ Review
-→ Canonical Graph
+who_get_task_profile
+who_explain_preference    后续
+who_get_profile_history   后续
+who_get_evidence          后续
 ```
 
-### 4.3 IngestionRun 是 Index Status
+不建立 `core_*`、`context_*` 等第三产品工具集。
 
-`IngestionRun` 不只是后台任务记录，而是 Agent 和人判断图谱可信度的质量入口。
+## 5. Compact First
 
-第一版增加：
+Codebase-Memory 的价值之一是用结构结果代替大量原始代码读取。
+
+ME-System 统一支持三种输出深度：
 
 ```text
+compact
+  ID、类型、标签、状态、关键关系
+
+standard
+  增加属性、时间、来源句柄和质量信息
+
+full
+  按权限增加证据片段和更多属性
+```
+
+列表和子图结果逐步统一返回：
+
+```text
+total
+returned
+truncated
+next_cursor
+coverage
+quality
+```
+
+Agent 必须知道结果是否完整，不能把“没有索引到”误认为“事实不存在”。
+
+## 6. MCP 与 CLI 对等
+
+Codebase-Memory 的主要工具也能从 CLI 调用。
+
+ME-System 应保持：
+
+```text
+应用服务
+├── MCP Adapter
+├── CLI Adapter
+└── 未来 Web Adapter
+```
+
+MCP 和 CLI 不复制图谱查询逻辑。
+
+## 7. Project Scope
+
+Codebase-Memory 的结构查询围绕具体代码项目执行。
+
+ME-System 对应规则：
+
+- ME-Brain 查询必须带 canonical `project_id`；
+- 项目解析使用确定性 ID、名称、别名、目录或外部 ID；
+- 不用 LLM 模糊猜测项目；
+- ME-Who 按用户、项目、任务类型和 Agent 身份裁剪；
+- 不允许普通 Agent 扫描整个 ME-Who 图谱。
+
+## 8. Index Status 与 Coverage
+
+Codebase-Memory 把索引状态作为正式能力。
+
+ME-System 的 `IngestionRun` 应包含：
+
+```text
+adapter_name
+adapter_version
 input_item_count
 processed_item_count
 skipped_item_count
@@ -289,82 +193,248 @@ candidate_count
 coverage_ratio
 quality_report
 log_ref
+status
 ```
 
-### 4.4 一个事务边界
+这既是运维信息，也是 Agent 判断图谱可信度的依据。
 
-Candidate 批准、权威图谱写入、证据写入和 ReviewEvent 必须在同一个 PostgreSQL 事务中完成。
+## 9. 增量和本地优先
 
-### 4.5 一个应用服务面
+ME-System 对应实现：
 
-后续所有接口复用：
+- SourceRecord 通过幂等键和内容哈希识别变化；
+- Adapter 重跑只处理变化内容；
+- Candidate 具备幂等键；
+- 图谱通过 ChangeSet 增量更新；
+- PostgreSQL 是本地/NAS 的唯一权威库；
+- 不为每个 Adapter 创建独立数据库。
+
+---
+
+# 三、ME-Brain 如何参考 Codebase-Memory
+
+## 1. 作用对应
+
+| Codebase-Memory | ME-Brain |
+|---|---|
+| 理解代码库结构 | 理解科研、设计、开发项目结构 |
+| Function / Class / File | Decision / Requirement / Task / Artifact |
+| CALLS / IMPORTS | DEPENDS_ON / IMPLEMENTS / BLOCKS / SUPERSEDES |
+| Architecture overview | Project snapshot |
+| Call path | Decision / dependency path |
+| Change impact | Project impact analysis |
+| Code snippet | Evidence fragment |
+| Index status | Project ingestion status |
+
+## 2. ME-Brain 图谱对象
+
+### 节点
 
 ```text
-SourceLedgerService
-IngestionStatusService
-CandidateReviewService
-GraphQueryService
+Project
+Workstream
+Requirement
+Decision
+Task
+Issue
+Constraint
+Artifact
+Experiment
+Document
+Person
+Evidence
 ```
 
-MCP、CLI 和未来 Web UI 只调用这些服务。
-
-### 4.6 先统一名称，再增加功能
-
-在实现 Source Ledger 前完成：
+### 关系
 
 ```text
-services/me-graph-core  → services/me-core
-me_graph_core           → me_core
-me-graph-core           → me-core
+HAS_REQUIREMENT
+HAS_DECISION
+HAS_TASK
+HAS_ISSUE
+HAS_ARTIFACT
+SUPERSEDES
+SATISFIES
+DEPENDS_ON
+BLOCKS
+IMPLEMENTS
+PRODUCES
+SUPPORTED_BY
 ```
 
-CLI 与 MCP 命令使用产品名：
+## 3. 主要查询
+
+ME-Brain 应优先回答结构问题，而不是只返回相似段落：
+
+- 当前阶段、路线和约束是什么；
+- 哪条决策替代了旧决策；
+- 哪个问题阻塞了哪些任务；
+- 某个成果实现了哪些决策和需求；
+- 某项变化影响哪些对象；
+- 每个结论的证据在哪里。
+
+---
+
+# 四、ME-Who 如何参考 Codebase-Memory
+
+## 1. 作用对应
+
+Codebase-Memory 将代码对象和关系预先结构化，使 Agent 不必重新理解整个代码库。
+
+ME-Who 将用户相关事实和关系预先结构化，使 Agent 不必从全部历史对话重新推断用户。
+
+## 2. ME-Who 图谱对象
+
+### 节点
 
 ```text
-me-system
-me-system-mcp
+User
+Role
+Capability
+Preference
+CollaborationRule
+Goal
+ProjectRole
+Experience
+Evidence
 ```
 
-旧命令可以保留一个小版本的兼容别名，但文档不再把它们作为主入口。
-
-## 5. 推荐开发顺序
+### 关系
 
 ```text
-1. 单核心 ADR
-2. ME-Core 名称与包路径迁移
-3. SourceRecord / EvidenceFragment / IngestionRun
-4. Alembic 0002
-5. SourceLedgerRepository
-6. Persistent Candidate Buffer
-7. 原子 Candidate Review
-8. CLI parity
-9. PostgreSQL E2E
-10. Agent Conversation Pass
-11. ingestion status / coverage MCP
+HAS_ROLE
+HAS_CAPABILITY
+PREFERS
+HAS_COLLABORATION_RULE
+HAS_GOAL
+PARTICIPATES_IN
+APPLIES_TO
+SUPERSEDES
+CONFIRMED_BY
+SUPPORTED_BY
 ```
 
-## 6. 最终结论
+## 3. 与代码图不同的额外约束
 
-ME-System 不应变成：
+ME-Who 必须比 Codebase-Memory 更严格：
+
+- 每个高价值节点和关系必须有证据；
+- 区分用户明确确认、行为证据和模型推断；
+- 偏好必须有适用范围；
+- 支持有效时间和替代关系；
+- 任务无关的个人信息不返回；
+- 普通 Agent 不获得任意图查询能力；
+- 用户拥有修改、否定和删除权。
+
+## 4. 主要查询
+
+- 当前任务需要哪些用户背景；
+- Agent 应采用怎样的自主程度；
+- 哪些内容已经确认，不应重复询问；
+- 某项偏好适用于什么项目或任务；
+- 该判断的证据和确认状态是什么；
+- 过去的偏好如何变化。
+
+---
+
+# 五、共享实现不构成第三个产品
+
+目标仓库结构：
 
 ```text
-ME-Brain 服务
-+ ME-Who 服务
-+ Source Ledger 服务
-+ Candidate 服务
-+ MCP 服务
-+ Context 服务
+me-system/
+├── me-brain/
+│   ├── ontology/
+│   ├── passes/
+│   └── queries/
+├── me-who/
+│   ├── ontology/
+│   ├── passes/
+│   └── queries/
+├── shared/
+│   ├── contracts/
+│   ├── graph/
+│   ├── evidence/
+│   ├── ingestion/
+│   ├── persistence/
+│   ├── permissions/
+│   └── query/
+└── integrations/
+    ├── mcp/
+    ├── hermes/
+    └── pi/
 ```
 
-而应保持：
+`shared/` 仅代表技术复用。
+
+其中：
+
+- ME-Brain 与 ME-Who 分别拥有自己的本体、Pass 和查询；
+- 两者共享 GraphNode、GraphEdge、EvidenceRef、时间、权限和 PostgreSQL；
+- MCP 只暴露 `brain_*` 与 `who_*`；
+- Source/Evidence 输入管线通过 `target_graph` 将 Candidate 送往相应图谱。
+
+---
+
+# 六、不应照搬 Codebase-Memory
+
+## 1. 不开放任意 Cypher
+
+Codebase-Memory 的代码结构图适合提供只读 Cypher。ME-Who 包含个人敏感数据，任意图查询可能绕过权限裁剪。
+
+结论：Agent 使用类型化工具；管理员查询未来单独设计。
+
+## 2. 不让自动语义抽取直接成为权威事实
+
+AST、函数、调用关系多数可确定性重建；用户偏好、项目决策和研究结论可能存在歧义。
+
+结论：
 
 ```text
-一个 ME-Core
-├── 两个权威图谱命名空间
-├── 一个证据与候选摄取管线
-├── 一个 PostgreSQL 真相源
-├── 一个查询语义层
-└── 多个薄前端（MCP / CLI / Web）
+确定性结构 → 可规则确认
+语义事实 → Candidate → 审核 → 权威图谱
 ```
 
-这就是从 Codebase-Memory 最应该吸收的核心优势。
+## 3. 不采用每项目 SQLite 作为权威数据
+
+ME-System 需要跨项目来源、审核事务和 ME-Who，因此继续使用一个 PostgreSQL 权威库，通过图谱 namespace 隔离。
+
+## 4. 不一次开放大量 MCP 工具
+
+新增工具必须满足至少一项：
+
+- 明显降低 Token；
+- 提升准确率；
+- 暴露必要质量状态；
+- 解决已验证的 Agent 工作流问题。
+
+## 5. 不自动授权全部 Agent 访问 ME-Who
+
+Hermes、Pi、Codex 使用不同工具 Profile 和项目 allowlist；默认只允许 Hermes 获取任务相关 ME-Who。
+
+---
+
+# 七、对当前开发路线的调整
+
+```text
+1. 只保留 ME-Brain / ME-Who 两个产品图谱
+2. 将早期 me-graph-core 命名迁移到无产品身份的 shared 实现
+3. 建立 SourceRecord / EvidenceFragment / IngestionRun
+4. 持久化 Candidate Buffer 与审核事件
+5. 让两个图谱共享输入设施，但分别拥有本体和查询
+6. Agent Conversation Adapter
+7. Markdown Adapter
+8. Git Adapter
+9. 增加 status / coverage 查询
+10. 以真实任务比较 Token、速度和准确率
+```
+
+# 八、最终判断
+
+从 Codebase-Memory 应吸收的是：
+
+> **两个产品图谱都先建立持久化、可查询、增量更新的结构模型；Agent 通过少量类型化 MCP 工具读取结构，不再每次重扫全部原始资料。**
+
+不应吸收的是：
+
+> 再新增一个名为 Core、Context 或 Reader 的平级产品。
