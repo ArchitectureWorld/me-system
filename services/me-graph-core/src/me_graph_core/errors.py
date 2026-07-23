@@ -20,3 +20,15 @@ class GraphNamespaceError(GraphCoreError, ValueError):
 
 class CandidateReviewError(GraphCoreError, ValueError):
     """Raised when a candidate change cannot be reviewed or applied."""
+
+
+class GraphStoreConfigurationError(GraphCoreError, ValueError):
+    """Raised when persistent graph storage configuration is invalid."""
+
+
+class GraphStoreUnavailableError(GraphCoreError):
+    """Raised when persistent graph storage cannot complete an operation."""
+
+
+class GraphMigrationError(GraphCoreError):
+    """Raised when a graph database migration cannot be applied."""
