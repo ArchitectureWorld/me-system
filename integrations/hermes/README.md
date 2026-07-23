@@ -6,7 +6,8 @@ Hermes 通过 stdio MCP 读取 ME-System。MCP Adapter 只包装 `GraphQueryServ
 
 1. PostgreSQL GraphStore 已迁移并包含项目图谱；
 2. `me-graph-core` 已安装；
-3. 环境中存在：
+3. 已为 Hermes 准备专用只读数据库账号；
+4. Hermes MCP 配置中显式提供：
 
 ```text
 ME_GRAPH_DATABASE_URL
@@ -36,6 +37,21 @@ who_get_task_profile
 
 没有任何写入、审核、SQL 或任意 Cypher 工具。
 
+## PostgreSQL 只读账号
+
+迁移和图谱导入继续使用管理/写入账号。Hermes 使用独立只读账号，例如：
+
+```sql
+CREATE ROLE me_graph_reader LOGIN PASSWORD 'REPLACE_ME';
+GRANT CONNECT ON DATABASE me_graph TO me_graph_reader;
+GRANT USAGE ON SCHEMA public TO me_graph_reader;
+GRANT SELECT ON TABLE graph_objects, graph_evidence_refs TO me_graph_reader;
+```
+
+若部署使用自定义 Schema，请将 `public` 替换为实际 Schema，并对其中两张图谱表授予 `SELECT`。
+
+这样即使 MCP 进程出现缺陷，数据库本身也拒绝写入。
+
 ## Hermes 配置
 
 将 [`config.example.yaml`](config.example.yaml) 中的 `me_system` 部分合并到：
@@ -44,7 +60,13 @@ who_get_task_profile
 ~/.hermes/config.yaml
 ```
 
-真实数据库 URL 建议通过进程环境提供，不要提交到仓库。
+当前 Hermes stdio MCP 会传递 `env` 中显式写出的值，但不要假设 `${VAR}` 会自动展开。请在本机配置中替换数据库 URL 占位值，并保护文件：
+
+```bash
+chmod 600 ~/.hermes/config.yaml
+```
+
+不要把真实配置提交到 Git。
 
 ## 使用顺序
 
@@ -63,6 +85,8 @@ who_get_task_profile
 - 只有显式配置 `*` 才允许全部项目；
 - `ME_GRAPH_HERMES_USER_ID` 由服务端注入，模型无法通过参数切换用户；
 - 对象查询必须同时给出项目 ID，并验证对象属于该项目；
+- 项目成员来自显式 `HAS_*` 所有权关系；任意跨项目语义边不会扩大授权；
+- 只有未被其他项目明确拥有的历史决策，才可通过 `SUPERSEDES` 继承项目范围；
 - Bridge 和 ME-Who 节点不能通过 ME-Brain 对象工具读取；
 - 默认子图最大深度为 2，绝对上限为 3。
 
@@ -73,10 +97,18 @@ who_get_task_profile
 ## 启动测试
 
 ```bash
-ME_GRAPH_DATABASE_URL='postgresql+psycopg://...' \
+ME_GRAPH_DATABASE_URL='postgresql+psycopg://me_graph_reader:密码@127.0.0.1:5432/me_graph' \
 ME_GRAPH_HERMES_USER_ID='who:user:master' \
 ME_GRAPH_ALLOWED_PROJECT_IDS='brain:project:lighting-platform' \
 me-graph-mcp
 ```
 
 这是 stdio Server，直接启动后等待 MCP Client，不会显示普通交互式命令行。
+
+Hermes 配置变更后，使用：
+
+```text
+/reload-mcp
+```
+
+重新加载工具。
