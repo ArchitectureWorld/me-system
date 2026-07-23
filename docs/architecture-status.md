@@ -13,7 +13,7 @@
    - Context Pack 是 GraphSlice 的运行时投影。
 
 2. `docs/adr/ADR-0003-agent-context-access-layer.md`
-   - 仅规定 Agent 不直连数据库，以及 Hermes/Pi 的访问边界。
+   - 规定 Agent 不直连数据库，以及 Hermes/Pi 的访问边界。
    - 受 ADR-0004 约束，不得反向定义图谱模型。
 
 ## 当前有效的实现契约
@@ -23,6 +23,7 @@
 - `docs/specs/me-who-ontology-v0.1.md`
 - `services/me-graph-core/schemas/`
 - `docs/superpowers/specs/2026-07-23-postgresql-graph-store-design.md`
+- `docs/superpowers/specs/2026-07-23-hermes-readonly-mcp-design.md`
 
 ## 当前可运行基线
 
@@ -44,17 +45,35 @@
 - `db-upgrade`、`import-fixture` 和数据库查询 CLI；
 - `deploy/postgres/`：PostgreSQL 16 Compose 示例。
 
-当前实现已经在 GitHub Actions 中通过 Python 3.11、Python 3.12 和真实 PostgreSQL 服务测试。
+### Hermes 只读访问
+
+- canonical ID、label、alias、workspace path 和 external ID 的确定性 Project Resolver；
+- `ME_GRAPH_ALLOWED_PROJECT_IDS` 服务端 allowlist；
+- `ME_GRAPH_HERMES_USER_ID` 固定 ME-Who 用户；
+- 显式项目所有权和历史决策继承范围；
+- 跨项目语义边不扩大授权；
+- 六个只读 stdio MCP 工具；
+- `integrations/hermes/` 配置、Bootstrap 和部署说明。
+
+当前实现已在 GitHub Actions 中通过：
+
+```text
+Python 3.11 单元与契约测试
+Python 3.12 单元与契约测试
+PostgreSQL 16 迁移和图谱查询
+真实 stdio MCP ClientSession E2E
+```
 
 ## 当前实现边界
 
 以下内容尚未完成：
 
-- 项目名称、工作目录和外部标识的 ID Resolve；
-- Hermes 只读 MCP Server；
+- 使用真实 Hermes UI/Agent 的项目恢复 Benchmark；
 - 文档、对话和 Git 的 CandidateGraphChange Adapter；
 - 未批准 Candidate 与审核日志的跨重启持久化；
-- 字段级 Agent 权限过滤；
+- 图谱字段级 Agent 权限过滤；
+- 原始证据正文读取和内容脱敏；
+- Streamable HTTP / OAuth MCP；
 - 图谱治理界面；
 - Pi Extension；
 - 生产规模下的批量证据读取优化。
@@ -81,15 +100,16 @@
 - 独立 Agent Context Gateway 作为系统核心；
 - 在权威图谱之前优先建设完整 Handoff、复杂 Token 编译和多 Agent 编排协议；
 - Agent 直接查询数据库或生成任意 Cypher；
-- 同时维护多个权威数据库实现。
+- 同时维护多个权威数据库实现；
+- 用 LLM 或模糊匹配擅自猜测项目范围。
 
 历史研究内容可通过 Git 历史和已关闭 PR 查看，不继续保留为主分支活动规格。
 
 ## 下一实施切片
 
 ```text
-项目 ID Resolve
-→ 只读 Graph Query API
-→ Hermes MCP Adapter
-→ “继续推进 lighting-platform”端到端闭环
+真实 Hermes 项目恢复 Benchmark
+→ Agent Conversation Adapter
+→ Candidate 持久化与审核
+→ Markdown / Git Adapter
 ```

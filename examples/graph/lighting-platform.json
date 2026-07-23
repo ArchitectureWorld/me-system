@@ -14,7 +14,7 @@
     }
   },
   "nodes": [
-    {"id":"brain:project:lighting-platform","graph":"me_brain","type":"Project","label":"lighting-platform","properties":{"stage":"schema-design","goal":"建立可扩展照明计算平台"},"anchor":"project-definition"},
+    {"id":"brain:project:lighting-platform","graph":"me_brain","type":"Project","label":"lighting-platform","properties":{"stage":"schema-design","goal":"建立可扩展照明计算平台","aliases":["lighting platform","照明平台"],"workspace_paths":["/workspace/lighting-platform"],"external_ids":{"github":"ArchitectureWorld/lighting-platform","slug":"lighting-platform"}},"anchor":"project-definition"},
     {"id":"brain:decision:radiance-primary","graph":"me_brain","type":"Decision","label":"Radiance 作为主计算核心","properties":{"decision":"primary_engine","value":"Radiance"},"anchor":"lighting-decision-14"},
     {"id":"brain:decision:cycles-primary","graph":"me_brain","type":"Decision","label":"Cycles 作为主计算核心","properties":{"decision":"primary_engine","value":"Cycles"},"status":"superseded","valid_from":"2026-06-20T00:00:00Z","valid_to":"2026-07-14T00:00:00Z","anchor":"lighting-decision-old"},
     {"id":"brain:decision:ifc-primary-input","graph":"me_brain","type":"Decision","label":"IFC 作为第一阶段主要输入","properties":{"decision":"primary_input","value":"IFC"},"anchor":"ifc-decision-14"},

@@ -32,21 +32,54 @@
 - 内存 Store 与持久化 Store 查询一致性；
 - Python 3.11 / 3.12 + PostgreSQL CI。
 
-### 下一步
+### 已完成：Project Resolve 与 Hermes 只读 MCP
 
-1. 实现项目名称、工作目录和外部 ID Resolve；
-2. 暴露只读 Graph Query API；
-3. 实现 Hermes MCP Server；
-4. 对比全文件探索与 GraphSlice 的 Token、延迟和准确度。
+- canonical ID、label、alias、workspace path 和 external ID 精确解析；
+- 不使用 LLM 或模糊匹配猜项目；
+- 服务端 project allowlist；
+- 服务端固定 ME-Who 用户；
+- 显式项目所有权范围；
+- 跨项目语义边不扩大权限；
+- 历史决策受其他项目所有权约束；
+- 六工具 stdio MCP；
+- Hermes 工具白名单和 Bootstrap；
+- MCP Python SDK 固定 `<2`；
+- Python 3.11 / 3.12 单元测试；
+- PostgreSQL 16 + 真实 stdio ClientSession E2E。
 
-### 验收
+### Phase 1 剩余工作：真实 Hermes Benchmark
+
+1. 在实际 Hermes 安装中加载 `me_system` MCP；
+2. 固定项目问题集；
+3. 对比：
+
+```text
+A. Hermes 直接探索项目文件
+B. Hermes + ME-Brain GraphSlice
+C. Hermes + ME-Brain + ME-Who Task Profile
+```
+
+4. 记录：
+
+- 输入 Token；
+- MCP / 文件工具调用次数；
+- 首次项目恢复延迟；
+- 当前事实准确率；
+- 过期方案误用率；
+- 来源覆盖率；
+- 重复询问次数；
+- 用户纠正次数。
+
+### Phase 1 验收
 
 - 当前决策不混入过期方案；
 - 阻塞任务和问题可查询；
 - 决策可以返回证据；
 - 数据跨进程和重启保持；
 - Hermes 不直接扫描全部文件；
-- Hermes 不直接连接数据库。
+- Hermes 不直接连接数据库；
+- 非允许项目和跨项目对象不能越权返回；
+- GraphSlice 相比全文件探索在真实任务中有可测收益。
 
 ## Phase 2：输入和候选图谱
 
@@ -75,25 +108,27 @@ CandidateGraphChange
 - pending Candidate 持久化；
 - 审核日志；
 - 批量导入事务；
-- 失败重试和幂等键。
+- 失败重试和幂等键；
+- Agent 字段级权限过滤；
+- 证据正文读取和脱敏。
 
-## Phase 3：最小 ME-Who
+## Phase 3：最小 ME-Who 深化
 
-先实现：
+当前已有：
 
 - 用户角色；
 - 专业能力；
 - 项目参与关系；
 - 明确协作规则；
-- 用户确认偏好。
+- 任务类型过滤。
 
-Hermes 查询：
+后续增加：
 
-```text
-ME-Brain Project Snapshot
-+
-ME-Who Task Profile
-```
+- 用户确认偏好；
+- 规则有效期与替代；
+- 候选行为证据；
+- 用户确认和禁止使用；
+- 敏感度与字段级授权。
 
 验证重复询问和协作错误是否下降。
 
@@ -113,7 +148,7 @@ ME-Who Task Profile
 
 ## Phase 5：Pi 与执行 Agent
 
-在 Hermes 只读闭环稳定后实现 Pi Extension：
+在 Hermes Benchmark 和 Candidate 闭环稳定后实现 Pi Extension：
 
 - 当前项目 GraphSlice；
 - 任务相关 ME-Who 规则；
@@ -152,7 +187,7 @@ Brief / Option / DesignDecision / Drawing / Model / Review / Revision
 
 ## 暂停开发
 
-在 Hermes 只读闭环通过前，不优先投入：
+在真实 Hermes Benchmark 和输入候选闭环通过前，不优先投入：
 
 - 完整多 Agent Handoff 平台；
 - 全格式万能文档标准；
