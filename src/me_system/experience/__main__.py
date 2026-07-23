@@ -5,12 +5,13 @@ import os
 from pathlib import Path
 import sys
 
+from ..persistence.migrations import _project_root as _migration_project_root
 from .runner import run_acceptance
 from .server import ExperienceApplication, create_server
 
 
 def _project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    return _migration_project_root()
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -25,7 +26,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fixture",
         type=Path,
-        default=_project_root() / "examples" / "graph" / "lighting-platform.json",
+        default=(
+            _project_root()
+            / "examples"
+            / "graph"
+            / "lighting-platform.json"
+        ).resolve(),
     )
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8765)
@@ -35,9 +41,10 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
     if not args.database_url:
-        _parser().error("--database-url or ME_GRAPH_DATABASE_URL is required")
+        parser.error("--database-url or ME_GRAPH_DATABASE_URL is required")
     application = ExperienceApplication(
         lambda: run_acceptance(
             args.database_url,
