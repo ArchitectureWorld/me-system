@@ -32,3 +32,11 @@ class GraphStoreUnavailableError(GraphCoreError):
 
 class GraphMigrationError(GraphCoreError):
     """Raised when a graph database migration cannot be applied."""
+
+
+class HermesConfigurationError(GraphCoreError, ValueError):
+    """Raised when the Hermes read-only MCP configuration is invalid."""
+
+
+class ProjectAccessError(GraphCoreError, PermissionError):
+    """Raised when an object is outside the configured Hermes project scope."""
