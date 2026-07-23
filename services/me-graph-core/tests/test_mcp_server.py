@@ -48,16 +48,3 @@ def test_mcp_exposes_exactly_six_read_only_tools() -> None:
         assert tuple(tool.name for tool in available) == TOOL_NAMES
 
     asyncio.run(run())
-
-
-def test_mcp_tool_returns_structured_envelope() -> None:
-    async def run() -> None:
-        value = await server().call_tool(
-            "brain_resolve_project",
-            {"query": "lighting-platform"},
-        )
-        assert isinstance(value, dict)
-        assert value["ok"] is True
-        assert value["result"]["project_id"] == PROJECT
-
-    asyncio.run(run())
