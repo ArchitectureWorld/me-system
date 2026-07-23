@@ -1,0 +1,25 @@
+name: Export unify workspace
+
+on:
+  push:
+    branches:
+      - agent/unify-me-system-package
+
+permissions:
+  contents: read
+
+tasks: {}
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Upload workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: me-system-unify-workspace
+          path: .
+          include-hidden-files: true
+          retention-days: 1
