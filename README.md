@@ -57,13 +57,13 @@ services/me-graph-core/
 - `InMemoryGraphStore` 与 PostgreSQL `SqlAlchemyGraphStore`；
 - Alembic 数据库迁移和 psycopg 3 连接；
 - 候选变更提交、人工批准和驳回；
-- 当前项目快照；
-- 决策替代链追踪；
-- 子图展开；
-- 原始证据查询；
+- 当前项目快照、决策链、子图和证据查询；
 - 任务相关的 ME-Who 协作规则筛选；
+- canonical ID、label、alias、工作目录和外部 ID 的确定性项目解析；
+- Hermes 六工具只读 stdio MCP；
+- 项目 allowlist、固定 ME-Who 用户和项目成员范围保护；
 - `lighting-platform` 双图谱示例；
-- Python 3.11 / 3.12 与真实 PostgreSQL 的 CI 验证。
+- Python 3.11 / 3.12、PostgreSQL 16 和真实 stdio MCP 客户端 CI。
 
 ### Fixture 体验
 
@@ -101,7 +101,31 @@ me-graph project-snapshot \
   --project-id brain:project:lighting-platform
 ```
 
-部署与安全说明见 [`services/me-graph-core/README.md`](services/me-graph-core/README.md)。
+部署说明见 [`services/me-graph-core/README.md`](services/me-graph-core/README.md)。
+
+### Hermes 只读 MCP
+
+第一版向 Hermes 只暴露：
+
+```text
+brain_resolve_project
+brain_get_snapshot
+brain_expand_subgraph
+brain_trace_decision
+brain_get_evidence
+who_get_task_profile
+```
+
+本地直接启动：
+
+```bash
+ME_GRAPH_DATABASE_URL='postgresql+psycopg://me_graph_reader:密码@127.0.0.1:5432/me_graph' \
+ME_GRAPH_HERMES_USER_ID='who:user:master' \
+ME_GRAPH_ALLOWED_PROJECT_IDS='brain:project:lighting-platform' \
+me-graph-mcp
+```
+
+Hermes 配置、只读数据库账号和工具白名单见 [`integrations/hermes/README.md`](integrations/hermes/README.md)。
 
 ### 测试
 
@@ -138,7 +162,7 @@ me-system/
 └── docs/
 ```
 
-当前 `me-graph-core` 将契约、内存 Store、PostgreSQL Store、迁移和查询放在一个可运行包中。等接口与真实工作流稳定后，再按目标结构拆分服务。
+当前 `me-graph-core` 将契约、内存 Store、PostgreSQL Store、迁移、查询和 Hermes stdio MCP 放在一个可运行包中。等接口与真实工作流稳定后，再按目标结构拆分服务。
 
 ## 文档导航
 
@@ -152,21 +176,23 @@ me-system/
 - [ME-Who 产品定义](docs/products/me-who.md)
 - [推荐开发路径](docs/roadmap/recommended-development-path.md)
 - [PostgreSQL GraphStore 设计](docs/superpowers/specs/2026-07-23-postgresql-graph-store-design.md)
-- [Hermes 接入边界](integrations/hermes/README.md)
+- [Hermes 只读 MCP 设计](docs/superpowers/specs/2026-07-23-hermes-readonly-mcp-design.md)
+- [Hermes 接入与部署](integrations/hermes/README.md)
 - [Pi 接入边界](integrations/pi/README.md)
 
 ## 当前开发优先级
 
 ```text
-1. 双图谱契约与真实样本                  已完成首版
-2. PostgreSQL GraphStore                 已完成首版
-3. 项目 ID Resolve 与只读 Graph Query API
-4. Hermes MCP 只读 Adapter
-5. Source / Evidence 与对话、Markdown、Git Adapter
-6. 最小 ME-Who 图谱深化
-7. Candidate 持久化与治理
-8. Pi Extension
-9. Research / Software / Design 领域扩展
+1. 双图谱契约与真实样本                    已完成首版
+2. PostgreSQL GraphStore                   已完成首版
+3. Project ID Resolve                      已完成首版
+4. Hermes MCP 只读 Adapter                 已完成首版
+5. 真实 Hermes 项目恢复 Benchmark
+6. Source / Evidence 与对话、Markdown、Git Adapter
+7. Candidate 持久化、审核与字段级权限
+8. 最小 ME-Who 图谱深化
+9. Pi Extension
+10. Research / Software / Design 领域扩展
 ```
 
-在 Hermes 只读闭环和输入候选闭环稳定前，不优先开发完整前端、复杂 Handoff 平台、全格式文档解析或数字人格。
+在真实 Hermes 项目恢复和输入候选闭环稳定前，不优先开发完整前端、复杂 Handoff 平台、全格式文档解析或数字人格。
