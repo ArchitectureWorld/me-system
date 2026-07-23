@@ -5,7 +5,7 @@ from pathlib import Path
 from me_system.experience.__main__ import _parser
 
 
-def test_entrypoint_uses_configured_project_root_for_default_fixture(
+def test_entrypoint_uses_configured_project_root_and_loopback_defaults(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -23,3 +23,5 @@ def test_entrypoint_uses_configured_project_root_for_default_fixture(
     assert args.fixture == (
         tmp_path / "examples" / "graph" / "lighting-platform.json"
     ).resolve()
+    assert args.host == "127.0.0.1"
+    assert args.port == 8765
